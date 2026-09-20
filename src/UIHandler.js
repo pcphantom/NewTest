@@ -13,7 +13,6 @@ import {
     MIN_PLAYERS,
     PHASES,
     SYMBOL_GLYPHS,
-    TARGET_TYPES,
 } from "./Constants.js";
 import { get_character_definition, get_character_list } from "./CharacterData.js";
 import { get_card_definition } from "./CardData.js";

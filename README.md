@@ -4,7 +4,9 @@ This repository now contains a static browser implementation of the completed Py
 
 ## Play
 
-Open `index.html` through a web server, or publish the repository root with GitHub Pages. No build step and no external JavaScript dependencies are required.
+Open `index.html` through a web server. No build step and no external JavaScript dependencies are required.
+
+For GitHub Pages, use repository **Settings > Pages** and set **Source** to **Deploy from a branch**, with **main** and **/(root)** selected. The repository includes `.nojekyll` so GitHub Pages serves the static files directly.
 
 For local development:
 

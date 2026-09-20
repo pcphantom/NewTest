@@ -1,4 +1,4 @@
-name: Deploy GitHub Pages
+name: Validate browser game
 
 on:
   push:
@@ -8,18 +8,9 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
-
-concurrency:
-  group: github-pages
-  cancel-in-progress: true
 
 jobs:
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  test:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -28,22 +19,8 @@ jobs:
       - name: Test
         run: npm test
 
-      - name: Stage site
+      - name: Validate static entry
         run: |
-          mkdir _site
-          cp index.html Styles.css _site/
-          cp -R src _site/src
-
-      - name: Configure Pages
-        uses: actions/configure-pages@v5
-        with:
-          enablement: true
-
-      - name: Upload static site
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: _site
-
-      - name: Deploy
-        id: deployment
-        uses: actions/deploy-pages@v4
+          test -f index.html
+          test -f Styles.css
+          test -f src/GameBootstrap.js
