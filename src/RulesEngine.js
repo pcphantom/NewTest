@@ -14,14 +14,13 @@ import {
     BORING_STORY_DISCARD_COUNT,
     BUBBLE_HEARTH_END_HP,
     CARD_TYPES,
-    CHARACTER_ABILITY_IDS,
-    CHARACTER_IDS,
     CHIP_DAMAGE_IMMUNITY_THRESHOLD,
     CRT_SCREEN_FLICKER_DAMAGE,
     DECISION_TYPES,
     DEVELOPERS_FAVORITE_HP,
     DIVINE_SHIELD_HEALING,
     EFFECT_IDS,
+    EMPTY_HAND_DRAW_COUNT,
     FACE_TANK_HEALING,
     FLOPPY_DISK_DISCARD_COUNT,
     IGNORE_PAIN_ATTACK_REDUCTION,
@@ -40,8 +39,6 @@ import {
     RAID_PALADIN_HEALING,
     RAID_PALADIN_HP,
     SCREEN_BURN_DAMAGE,
-    SECOND_WIND_DRAW_COUNT,
-    SECOND_WIND_HEALING,
     SECOND_WIND_TRIGGER_HP,
     SHIELD_BASH_BONUS_DAMAGE,
     SYMBOL_NAMES,
@@ -60,6 +57,7 @@ const PLAYER_TARGET_EFFECTS = new Set([
     EFFECT_IDS.AGGRESSIVE_POSITIONING,
     EFFECT_IDS.MOCKING_BLOW,
     EFFECT_IDS.NERF_INCOMING,
+    EFFECT_IDS.WAKE_OF_ASHES,
 ]);
 
 export class RulesEngine {
@@ -90,7 +88,7 @@ export class RulesEngine {
         const card = this.get_card_from_hand(player, card_instance_id);
         const definition = get_card_definition(card.definition_id);
 
-        if (player.character_id !== CHARACTER_IDS.PATCHADIN || player.can_do_everything_used_this_turn) {
+        if (definition.skill?.id !== 'can_do_everything') {
             return [];
         }
 
@@ -131,11 +129,8 @@ export class RulesEngine {
             return effective_symbols;
         }
 
-        if (player.character_id !== CHARACTER_IDS.PATCHADIN) {
-            throw new Error(`${player.name} cannot convert card symbols.`);
-        }
-        if (player.can_do_everything_used_this_turn) {
-            throw new Error(`${player.name} already used Can Do Everything this turn.`);
+        if (definition.skill?.id !== 'can_do_everything') {
+            throw new Error("Can Do Everything only applies to the Judgment card carrying that skill.");
         }
 
         const valid_names = [SYMBOL_NAMES.ATTACK, SYMBOL_NAMES.DEFENSE, SYMBOL_NAMES.HEALING];
@@ -160,19 +155,19 @@ export class RulesEngine {
         const definition = get_card_definition(card.definition_id);
         const effective_symbols = this.get_effective_symbols(player, definition, symbol_conversion);
 
-        if (definition.target_mode === TARGET_MODES.ALL_OPPONENTS) {
+        if (definition.target_mode === TARGET_MODES.ALL_OPPONENTS && definition.effect_id !== EFFECT_IDS.WAKE_OF_ASHES) {
             return [];
         }
 
         const needs_player_target = PLAYER_TARGET_EFFECTS.has(definition.effect_id);
         const has_single_target_attack = effective_symbols.attack > 0;
-        const requires_opponent = definition.target_mode === TARGET_MODES.OPPONENT || has_single_target_attack;
+        const requires_opponent = definition.target_mode === TARGET_MODES.OPPONENT || has_single_target_attack || needs_player_target;
 
         if (!requires_opponent) {
             return [];
         }
 
-        if (has_single_target_attack && player.forced_attack_target_player_id !== null) {
+        if (has_single_target_attack && definition.target_mode !== TARGET_MODES.ALL_OPPONENTS && player.forced_attack_target_player_id !== null) {
             const forced_player = this.game_state.get_player_by_id(player.forced_attack_target_player_id);
             if (!forced_player.eliminated) {
                 return [{
@@ -184,7 +179,16 @@ export class RulesEngine {
         }
 
         const targets = [];
-        const opponents = this.game_state.get_living_opponents(player.id);
+        let opponents = this.game_state.get_living_opponents(player.id);
+        const living_players = this.game_state.get_living_players();
+        if (living_players.length >= 5 && has_single_target_attack && definition.type !== CARD_TYPES.MIGHTY_POWER && definition.target_mode !== TARGET_MODES.ALL_OPPONENTS) {
+            const seat = living_players.findIndex(candidate => candidate.id === player.id);
+            const adjacent_ids = [
+                living_players[(seat + living_players.length - 1) % living_players.length].id,
+                living_players[(seat + 1) % living_players.length].id,
+            ];
+            opponents = opponents.filter(opponent => adjacent_ids.includes(opponent.id));
+        }
 
         for (const opponent of opponents) {
             targets.push({
@@ -235,33 +239,43 @@ export class RulesEngine {
         player.last_played_card_definition_id = definition.id;
 
         if (symbol_conversion !== null) {
-            player.can_do_everything_used_this_turn = true;
             this.game_state.add_event(`${player.name} used Can Do Everything: ${symbol_conversion.from} became ${symbol_conversion.to}.`, "ability");
         }
 
         this.game_state.add_event(`${player.name} played ${definition.name}.`, "card");
+        const hp_before_card = player.hp;
         this.trigger_phosphor_burn(player);
 
         const damaged_player_ids = this.resolve_base_symbols(player, card, definition, effective_symbols, target);
         this.resolve_special_effect(player, card, definition, target);
+        if (!player.eliminated) this.resolve_card_skill(player, definition, target, hp_before_card);
 
         const card_persists_as_defense = effective_symbols.defense > 0;
         if (!card_persists_as_defense) {
             this.deck_handler.discard_card_instance(player, card);
         }
 
-        if (player.character_id === CHARACTER_IDS.GRANDPA && damaged_player_ids.length > 0 && !player.eliminated) {
+        if (definition.skill?.id === 'screen_burn_in' && damaged_player_ids.length > 0 && !player.eliminated) {
             this.enqueue_screen_burn_decision(player, damaged_player_ids);
         }
 
         this.check_game_over();
+        this.refill_empty_active_hand();
+    }
+
+    refill_empty_active_hand() {
+        if (this.game_state.phase !== PHASES.PLAY || this.game_state.actions_remaining < 1 || this.game_state.get_current_decision() !== null) return;
+        const player = this.game_state.get_active_player();
+        if (player.eliminated || player.hand.length > 0) return;
+        const drawn = this.deck_handler.draw_cards(player, EMPTY_HAND_DRAW_COUNT);
+        this.game_state.add_event(`${player.name} drew ${drawn.length} cards because a mandatory play remained with an empty hand.`, "draw");
     }
 
     validate_target(player, card, target, symbol_conversion) {
         const legal_targets = this.get_legal_targets(player.id, card.instance_id, symbol_conversion);
         const definition = get_card_definition(card.definition_id);
         const effective_symbols = this.get_effective_symbols(player, definition, symbol_conversion);
-        const requires_target = definition.target_mode === TARGET_MODES.OPPONENT ||
+        const requires_target = definition.target_mode === TARGET_MODES.OPPONENT || definition.effect_id === EFFECT_IDS.WAKE_OF_ASHES ||
             (effective_symbols.attack > 0 && definition.target_mode !== TARGET_MODES.ALL_OPPONENTS);
 
         if (!requires_target) {
@@ -426,7 +440,7 @@ export class RulesEngine {
         }
 
         if (skipped_count > 0) {
-            this.game_state.add_event(`${player.name} lost ${skipped_count} Play Again action(s) to Monochrome Lecture.`, "status");
+            this.game_state.add_event(`${player.name} lost ${skipped_count} Play Again action(s) to a card's disruption effect.`, "status");
         }
 
         if (granted_count > 0) {
@@ -452,8 +466,22 @@ export class RulesEngine {
             case EFFECT_IDS.DIVINE_SHIELD:
             case EFFECT_IDS.DIVINE_STORM:
             case EFFECT_IDS.HAND_OF_PROTECTION:
-            case EFFECT_IDS.PALADINS_OP_AT_EVERYTHING:
                 return;
+            case EFFECT_IDS.DIVINE_INTERVENTION: {
+                const sacrificed = player.defenses.splice(0);
+                for (const defense of sacrificed) this.deck_handler.discard_card_instance(player, defense.card);
+                this.game_state.add_event(`${player.name} sacrificed ${sacrificed.length} Defense cards to Divine Intervention.`, "defense");
+                this.heal_player(player.id, player.max_hp, definition.name);
+                return;
+            }
+            case EFFECT_IDS.WAKE_OF_ASHES: {
+                const opponent = this.game_state.get_player_by_id(target.player_id);
+                if (!opponent.eliminated) {
+                    opponent.skip_next_play_again_count += 1;
+                    this.game_state.add_event(`${opponent.name}'s next Play Again action is cancelled by Wake of Ashes.`, "status");
+                }
+                return;
+            }
             case EFFECT_IDS.BACK_IN_MY_DAY:
                 this.apply_outgoing_attack_reduction(target.player_id, BACK_IN_MY_DAY_ATTACK_REDUCTION, definition.name);
                 return;
@@ -522,7 +550,7 @@ export class RulesEngine {
         const target_player = this.game_state.get_player_by_id(target_player_id);
         const roll = this.dice_handler.roll_d20();
         const succeeded = roll === 20 || (roll !== 1 && roll >= BORING_STORY_DC);
-        this.game_state.add_event(`${target_player.name} rolled ${roll} against Boring Story DC ${BORING_STORY_DC}.`, "dice");
+        this.game_state.add_event(`${target_player.name}: d20 ${roll} vs Boring Story DC ${BORING_STORY_DC}. Save ${succeeded ? 'succeeded' : 'failed'}.`, "dice");
 
         if (succeeded) {
             this.game_state.add_event(`${target_player.name} resisted Boring Story.`, "status");
@@ -734,6 +762,7 @@ export class RulesEngine {
         this.game_state.complete_current_decision(decision.id);
         this.finalize_decision_group_if_needed(decision);
         this.check_game_over();
+        this.refill_empty_active_hand();
     }
 
     resolve_discard_decision(decision, resolution) {
@@ -826,7 +855,7 @@ export class RulesEngine {
         if (resolution.action !== "attack" || typeof resolution.target_player_id !== "string") {
             throw new Error("Raid Paladin decision requires heal or attack with a target_player_id.");
         }
-        if (!decision.target_player_ids.includes(resolution.target_player_id)) {
+        if (!decision.target_player_ids.includes(resolution.target_player_id) || this.game_state.get_player_by_id(resolution.target_player_id).eliminated) {
             throw new Error("Raid Paladin target is not legal.");
         }
 
@@ -865,9 +894,6 @@ export class RulesEngine {
         this.expire_effects_sourced_by_player(player.id);
         this.expire_self_timed_effects(player);
 
-        player.monochrome_lecture_used_this_turn = false;
-        player.threat_generation_used_this_turn = false;
-        player.can_do_everything_used_this_turn = false;
         player.cards_played_this_turn = 0;
 
         const start_turn_effects = [...player.start_turn_damage_effects];
@@ -930,6 +956,10 @@ export class RulesEngine {
     }
 
     expire_self_timed_effects(player) {
+        if (player.developers_favorite_activated_turn !== null && player.developers_favorite_activated_turn < this.game_state.turn_number) {
+            player.developers_favorite_activated_turn = null;
+            this.game_state.add_event(`${player.name}'s Developer's Favorite protection expired.`, "status");
+        }
         if (player.tank_specs_activated_turn !== null && player.tank_specs_activated_turn < this.game_state.turn_number) {
             player.tank_specs_activated_turn = null;
         }
@@ -945,44 +975,31 @@ export class RulesEngine {
         return activated_turn_number !== null && activated_turn_number <= this.game_state.turn_number;
     }
 
-    use_character_ability(player_id, ability_id, target_player_id) {
-        const player = this.game_state.get_player_by_id(player_id);
-        if (this.game_state.phase !== PHASES.PLAY) {
-            throw new Error("Character abilities can only be used during the Play phase.");
+    resolve_card_skill(player, definition, target, hp_before_card) {
+        switch (definition.skill?.id) {
+            case 'monochrome_lecture':
+                if (!this.game_state.get_player_by_id(target.player_id).eliminated) this.resolve_monochrome_lecture(player, target.player_id);
+                break;
+            case 'second_wind':
+                if (hp_before_card <= SECOND_WIND_TRIGGER_HP) this.heal_player(player.id, 2, "Second Wind on Inspiring Presence");
+                break;
+            case 'developers_favorite':
+                if (!player.developers_favorite_used) {
+                    player.developers_favorite_activated_turn = this.game_state.turn_number;
+                    this.game_state.add_event(`${player.name} armed Developer's Favorite until their next turn.`, "status");
+                } else {
+                    this.game_state.add_event(`${player.name}'s Developer's Favorite rescue was already spent this match.`, "status");
+                }
+                break;
         }
-        if (this.game_state.get_active_player().id !== player.id) {
-            throw new Error(`${player.name} is not the active player.`);
-        }
-        if (this.game_state.get_current_decision() !== null) {
-            throw new Error("Resolve the pending decision before using a character ability.");
-        }
-
-        if (ability_id === CHARACTER_ABILITY_IDS.MONOCHROME_LECTURE) {
-            this.use_monochrome_lecture(player, target_player_id);
-            return;
-        }
-        if (ability_id === CHARACTER_ABILITY_IDS.THREAT_GENERATION) {
-            this.use_threat_generation(player, target_player_id);
-            return;
-        }
-
-        throw new Error(`Unknown active character ability: ${ability_id}`);
     }
 
-    use_monochrome_lecture(player, target_player_id) {
-        if (player.character_id !== CHARACTER_IDS.GRANDPA) {
-            throw new Error(`${player.name} does not have Monochrome Lecture.`);
-        }
-        if (player.monochrome_lecture_used_this_turn) {
-            throw new Error("Monochrome Lecture has already been used this turn.");
-        }
-
+    resolve_monochrome_lecture(player, target_player_id) {
         const target = this.validate_living_opponent(player.id, target_player_id);
         const roll = this.dice_handler.roll_d20();
         const succeeded = roll === 20 || (roll !== 1 && roll >= MONOCHROME_LECTURE_DC);
-        player.monochrome_lecture_used_this_turn = true;
 
-        this.game_state.add_event(`${target.name} rolled ${roll} against Monochrome Lecture DC ${MONOCHROME_LECTURE_DC}.`, "dice");
+        this.game_state.add_event(`${target.name}: d20 ${roll} vs Monochrome Lecture DC ${MONOCHROME_LECTURE_DC}. Save ${succeeded ? 'succeeded' : 'failed'}.`, "dice");
         if (!succeeded) {
             target.skip_next_play_again_count += 1;
             this.game_state.add_event(`${target.name} will skip their next Play Again action.`, "status");
@@ -994,22 +1011,6 @@ export class RulesEngine {
             source_name: "Monochrome Lecture",
         });
         this.check_game_over();
-    }
-
-    use_threat_generation(player, target_player_id) {
-        if (player.character_id !== CHARACTER_IDS.MALRIC) {
-            throw new Error(`${player.name} does not have Threat Generation.`);
-        }
-        if (player.threat_generation_used_this_turn) {
-            throw new Error("Threat Generation has already been used this turn.");
-        }
-        if (player.cards_played_this_turn > 0) {
-            throw new Error("Threat Generation must be used at the start of Malric's turn before playing a card.");
-        }
-
-        const target = this.validate_living_opponent(player.id, target_player_id);
-        player.threat_generation_used_this_turn = true;
-        this.force_attack_target(target.id, player.id, null);
     }
 
     validate_living_opponent(source_player_id, target_player_id) {
@@ -1159,21 +1160,15 @@ export class RulesEngine {
     }
 
     handle_survival_abilities(player) {
-        if (player.hp <= 0 && player.character_id === CHARACTER_IDS.PATCHADIN && !player.developers_favorite_used) {
+        if (player.hp <= 0 && player.developers_favorite_activated_turn !== null && !player.developers_favorite_used) {
             player.developers_favorite_used = true;
+            player.developers_favorite_activated_turn = null;
             player.hp = DEVELOPERS_FAVORITE_HP;
             this.game_state.add_event(`${player.name} triggered Developer's Favorite and returned to ${DEVELOPERS_FAVORITE_HP} HP.`, "ability");
         }
 
-        if (player.hp <= SECOND_WIND_TRIGGER_HP && player.character_id === CHARACTER_IDS.MALRIC && !player.second_wind_used) {
-            player.second_wind_used = true;
-            const hp_before_heal = player.hp;
-            player.hp = Math.min(player.max_hp, player.hp + SECOND_WIND_HEALING);
-            this.deck_handler.draw_cards(player, SECOND_WIND_DRAW_COUNT);
-            this.game_state.add_event(`${player.name} triggered Second Wind: ${hp_before_heal} HP became ${player.hp} HP and drew 2 cards.`, "ability");
-        }
-
         if (player.hp <= 0) {
+            player.hp = 0;
             player.eliminated = true;
             this.game_state.add_event(`${player.name} was eliminated.`, "elimination");
         }

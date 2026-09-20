@@ -346,19 +346,24 @@ Specific scene:
 
 > A magical tuning hammer descends toward an enemy's oversized weapon and visibly shrinks its aura and impact potential. Patchadin watches from the background with satisfied confidence. Avoid interface bars or written patch-note imagery.
 
-## patchadin_obvious_favoritism.png
-Card: Obvious Favoritism
+## patchadin_blatant_favoritism.png
+Card: Blatant Favoritism
 
 Specific scene:
 
 > Patchadin stands under an absurdly bright spotlight receiving extra weapon glow, healing light and protective aura at the same time while other adventurers remain dimly lit in the background looking irritated.
 
-## patchadin_paladins_op_at_everything.png
-Card: Paladins are OP at Everything
+## patchadin_divine_intervention.png
+Card: Divine Intervention
 
 Specific scene:
 
-> Patchadin performs three roles simultaneously in one coherent action: striking an enemy with a radiant weapon, projecting a strong shield and healing their own armor at the same time. Make the impossible multitasking visually clear and intentionally excessive.
+> Patchadin shatters every magical shield surrounding them into brilliant golden fragments. The fragments spiral into their damaged armor, restoring it completely in an absurd emergency intervention. Show the deliberate sacrifice of defenses for healing, with a relieved, smug expression.
+
+## patchadin_wake_of_ashes.png
+Card: Wake of Ashes
+
+> Patchadin sweeps a radiant weapon across a row of irritated opponents, sending a low wave of glowing ash into everyone while one opponent is comically frozen mid-combo. Retro pixel-art RPG parody, no text, numbers, symbols or card frame.
 
 ## patchadin_patch_notes.png
 Card: Patch Notes

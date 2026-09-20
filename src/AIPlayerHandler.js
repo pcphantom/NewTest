@@ -6,8 +6,6 @@
 
 import {
     CARD_TYPES,
-    CHARACTER_ABILITY_IDS,
-    CHARACTER_IDS,
     DECISION_TYPES,
     PHASES,
     PLAYER_TYPES,
@@ -68,8 +66,6 @@ export class AIPlayerHandler {
             throw new Error(`${player.name} is not a computer player.`);
         }
 
-        this.use_opening_character_ability(player);
-
         let action_guard = 0;
         while (this.game_state.phase === PHASES.PLAY && !player.eliminated) {
             action_guard += 1;
@@ -81,6 +77,7 @@ export class AIPlayerHandler {
                 return;
             }
 
+            this.rules_engine.refill_empty_active_hand();
             if (this.game_state.actions_remaining < 1 || player.hand.length === 0) {
                 break;
             }
@@ -104,39 +101,6 @@ export class AIPlayerHandler {
 
         if (this.game_state.phase === PHASES.PLAY && this.turn_handler.can_end_turn()) {
             this.turn_handler.end_turn(player.id);
-        }
-    }
-
-    use_opening_character_ability(player) {
-        const opponents = this.game_state.get_living_opponents(player.id);
-        if (opponents.length === 0) {
-            return;
-        }
-
-        const target = this.choose_lowest_hp_player(opponents);
-
-        if (
-            player.character_id === CHARACTER_IDS.GRANDPA &&
-            !player.monochrome_lecture_used_this_turn
-        ) {
-            this.rules_engine.use_character_ability(
-                player.id,
-                CHARACTER_ABILITY_IDS.MONOCHROME_LECTURE,
-                target.id
-            );
-            return;
-        }
-
-        if (
-            player.character_id === CHARACTER_IDS.MALRIC &&
-            !player.threat_generation_used_this_turn &&
-            player.cards_played_this_turn === 0
-        ) {
-            this.rules_engine.use_character_ability(
-                player.id,
-                CHARACTER_ABILITY_IDS.THREAT_GENERATION,
-                target.id
-            );
         }
     }
 
@@ -306,7 +270,8 @@ export class AIPlayerHandler {
 
             const targets = decision.target_player_ids.map((player_id) =>
                 this.game_state.get_player_by_id(player_id)
-            );
+            ).filter(target => !target.eliminated);
+            if (targets.length === 0) return {action: "heal"};
             const target = this.choose_lowest_hp_player(targets);
             return {
                 action: "attack",

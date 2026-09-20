@@ -9,6 +9,7 @@ export const STARTING_HP = 12;
 export const DECK_SIZE = 28;
 export const OPENING_HAND_SIZE = 3;
 export const CARDS_DRAWN_PER_TURN = 1;
+export const EMPTY_HAND_DRAW_COUNT = 2;
 export const BASE_ACTIONS_PER_TURN = 1;
 export const MIN_PLAYERS = 2;
 export const MAX_PLAYERS = 6;
@@ -127,11 +128,12 @@ export const EFFECT_IDS = Object.freeze({
     BUBBLE_HEARTH: "bubble_hearth",
     DIVINE_SHIELD: "divine_shield",
     DIVINE_STORM: "divine_storm",
+    DIVINE_INTERVENTION: "divine_intervention",
+    WAKE_OF_ASHES: "wake_of_ashes",
     HAND_OF_PROTECTION: "hand_of_protection",
     LAY_ON_HANDS: "lay_on_hands",
     LOVE_ME_OR_HATE_ME: "love_me_or_hate_me",
     NERF_INCOMING: "nerf_incoming",
-    PALADINS_OP_AT_EVERYTHING: "paladins_op_at_everything",
 });
 
 export const CHARACTER_ABILITY_IDS = Object.freeze({

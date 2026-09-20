@@ -171,7 +171,7 @@ export class TurnHandler {
         }
 
         const player = this.game_state.get_active_player();
-        return this.game_state.actions_remaining === 0 || player.hand.length === 0;
+        return this.game_state.actions_remaining === 0 || (player.hand.length === 0 && player.deck.length === 0 && player.discard.length === 0);
     }
 
     end_turn(player_id) {

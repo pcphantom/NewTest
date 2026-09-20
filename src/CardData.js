@@ -10,6 +10,7 @@ import {
     EFFECT_IDS,
     TARGET_MODES,
 } from "./Constants.js";
+import { get_character_definition } from "./CharacterData.js";
 
 function symbols(attack, defense, healing, draw, play_again) {
     return Object.freeze({ attack, defense, healing, draw, play_again });
@@ -26,7 +27,10 @@ function card_definition({
     effect_id,
     rules_text,
     flavor_text,
+    skill_id = null,
 }) {
+    const skill = skill_id === null ? null : get_character_definition(character_id).abilities.find(ability => ability.id === skill_id);
+    if (skill === undefined) throw new Error(`Unknown card skill: ${skill_id}`);
     return Object.freeze({
         id,
         character_id,
@@ -38,6 +42,7 @@ function card_definition({
         effect_id,
         rules_text,
         flavor_text,
+        skill,
     });
 }
 
@@ -56,6 +61,7 @@ const CARD_DEFINITIONS = Object.freeze([
     }),
     card_definition({
         id: "grandpa_back_in_my_day",
+        skill_id: "monochrome_lecture",
         character_id: CHARACTER_IDS.GRANDPA,
         name: "Back In My Day",
         copies: 2,
@@ -116,6 +122,7 @@ const CARD_DEFINITIONS = Object.freeze([
     }),
     card_definition({
         id: "grandpa_grayscale_bomb",
+        skill_id: "screen_burn_in",
         character_id: CHARACTER_IDS.GRANDPA,
         name: "Grayscale Bomb",
         copies: 2,
@@ -213,14 +220,15 @@ const CARD_DEFINITIONS = Object.freeze([
 
     card_definition({
         id: "malric_aggressive_positioning",
+        skill_id: "threat_generation",
         character_id: CHARACTER_IDS.MALRIC,
         name: "Aggressive Positioning",
         copies: 3,
         type: CARD_TYPES.UTILITY,
-        card_symbols: symbols(0, 0, 0, 0, 0),
+        card_symbols: symbols(0, 1, 0, 0, 0),
         target_mode: TARGET_MODES.OPPONENT,
         effect_id: EFFECT_IDS.AGGRESSIVE_POSITIONING,
-        rules_text: "Target opponent must attack you with their next attack if able. If they do, draw 1 card.",
+        rules_text: "Gain 1 shield.",
         flavor_text: "Over here! No, over HERE!",
     }),
     card_definition({
@@ -285,6 +293,7 @@ const CARD_DEFINITIONS = Object.freeze([
     }),
     card_definition({
         id: "malric_inspiring_presence",
+        skill_id: "second_wind",
         character_id: CHARACTER_IDS.MALRIC,
         name: "Inspiring Presence",
         copies: 1,
@@ -396,7 +405,7 @@ const CARD_DEFINITIONS = Object.freeze([
         id: "patchadin_blessing_of_kings",
         character_id: CHARACTER_IDS.PATCHADIN,
         name: "Blessing of Kings",
-        copies: 2,
+        copies: 1,
         type: CARD_TYPES.UTILITY,
         card_symbols: symbols(0, 0, 0, 0, 0),
         target_mode: TARGET_MODES.NONE,
@@ -490,6 +499,7 @@ const CARD_DEFINITIONS = Object.freeze([
     }),
     card_definition({
         id: "patchadin_judgment",
+        skill_id: "can_do_everything",
         character_id: CHARACTER_IDS.PATCHADIN,
         name: "Judgment",
         copies: 2,
@@ -537,28 +547,41 @@ const CARD_DEFINITIONS = Object.freeze([
         flavor_text: "Don't worry, it'll be reverted in the next patch.",
     }),
     card_definition({
-        id: "patchadin_obvious_favoritism",
+        id: "patchadin_blatant_favoritism",
+        skill_id: "developers_favorite",
         character_id: CHARACTER_IDS.PATCHADIN,
-        name: "Obvious Favoritism",
+        name: "Blatant Favoritism",
         copies: 2,
         type: CARD_TYPES.UTILITY,
-        card_symbols: symbols(2, 0, 0, 1, 1),
+        card_symbols: symbols(2, 1, 1, 0, 1),
         target_mode: TARGET_MODES.OPPONENT,
         effect_id: EFFECT_IDS.STANDARD,
-        rules_text: "Deal 2 damage. Draw 1 card. Play Again.",
-        flavor_text: "Everyone knows the devs main Paladin.",
+        rules_text: "Deal 2 damage. Gain 1 shield. Heal 1 HP. Play Again.",
+        flavor_text: "Because obviously, the devs ALL play Paladins!",
     }),
     card_definition({
-        id: "patchadin_paladins_op_at_everything",
+        id: "patchadin_divine_intervention",
         character_id: CHARACTER_IDS.PATCHADIN,
-        name: "Paladins are OP at Everything",
+        name: "Divine Intervention",
         copies: 1,
         type: CARD_TYPES.MIGHTY_POWER,
-        card_symbols: symbols(3, 3, 3, 0, 0),
-        target_mode: TARGET_MODES.OPPONENT,
-        effect_id: EFFECT_IDS.PALADINS_OP_AT_EVERYTHING,
-        rules_text: "Deal 3 damage, gain 3 shields, and heal 3 HP.",
-        flavor_text: "Patch Notes: We've decided Paladins needed a slight buff.",
+        card_symbols: symbols(0, 0, 0, 0, 1),
+        target_mode: TARGET_MODES.SELF,
+        effect_id: EFFECT_IDS.DIVINE_INTERVENTION,
+        rules_text: "Sacrifice all your Defense cards in play. Fully heal to your maximum HP. Play Again.",
+        flavor_text: "Removed in an old expansion, but we never forgot.",
+    }),
+    card_definition({
+        id: "patchadin_wake_of_ashes",
+        character_id: CHARACTER_IDS.PATCHADIN,
+        name: "Wake of Ashes",
+        copies: 1,
+        type: CARD_TYPES.ATTACK,
+        card_symbols: symbols(1, 0, 0, 0, 0),
+        target_mode: TARGET_MODES.ALL_OPPONENTS,
+        effect_id: EFFECT_IDS.WAKE_OF_ASHES,
+        rules_text: "Deal 1 damage to all opponents. Choose one opponent: cancel their next Play Again action.",
+        flavor_text: "We needed an AoE stun. For reasons.",
     }),
     card_definition({
         id: "patchadin_patch_notes",

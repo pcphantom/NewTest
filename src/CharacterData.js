@@ -17,12 +17,12 @@ export const CHARACTER_DEFINITIONS = Object.freeze({
             Object.freeze({
                 id: "monochrome_lecture",
                 name: "Monochrome Lecture",
-                description: "Once per turn, target opponent makes a DC 13 save. Failure skips their next Play Again action. They take 1 damage either way.",
+                description: "That opponent makes a DC 13 d20 save. On failure, cancel their next Play Again action. Deal 1 damage to them either way.",
             }),
             Object.freeze({
                 id: "screen_burn_in",
                 name: "Screen Burn-In",
-                description: "After a damaging Grandpa spell resolves, you may deal 1 additional damage to one opponent damaged by that spell.",
+                description: "After this card resolves, you may deal 1 extra damage to one surviving opponent it damaged. Choose that opponent or skip.",
             }),
         ]),
     }),
@@ -36,12 +36,12 @@ export const CHARACTER_DEFINITIONS = Object.freeze({
             Object.freeze({
                 id: "threat_generation",
                 name: "Threat Generation",
-                description: "At the start of your turn, you may force target opponent to attack you with their next attack.",
+                description: "Choose an opponent. Their next attack must target you if able. When they make that attack, draw 1 card.",
             }),
             Object.freeze({
                 id: "second_wind",
                 name: "Second Wind",
-                description: "Once per game, when reduced to 4 HP or less, immediately heal 6 HP and draw 2 cards.",
+                description: "If you had 4 HP or less before playing this card, heal 2 extra HP (6 total).",
             }),
         ]),
     }),
@@ -55,12 +55,12 @@ export const CHARACTER_DEFINITIONS = Object.freeze({
             Object.freeze({
                 id: "can_do_everything",
                 name: "Can Do Everything",
-                description: "Once per turn, after you play a card, change one Attack, Defense, or Healing symbol on that card to one of the other two symbols.",
+                description: "You may change 1 of this card's Attack symbols to 1 Defense or 1 Healing. Its Draw symbol stays the same. No other card is changed.",
             }),
             Object.freeze({
                 id: "developers_favorite",
                 name: "Developer's Favorite",
-                description: "The first time each game you would be reduced to 0 HP, set your HP to 6.",
+                description: "Until your next turn, the first hit that would reduce you to 0 HP sets you to 6 HP instead. This rescue can happen only once per match.",
             }),
         ]),
     }),

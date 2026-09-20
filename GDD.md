@@ -1,7 +1,7 @@
 # Dungeons & Mayhem
 ## Game Design Document
 
-Version: 0.2
+Version: 0.3
 Status: Browser playtest implementation
 
 ## 1. Game identity
@@ -147,9 +147,9 @@ The game screen is a tabletop card arena.
 
 - Opponent seats compress into a horizontal seat rail.
 - The active player's playmat remains the large primary region.
-- The hand becomes a horizontally scrollable fan.
+- A bottom hand bar remains on screen. Hover peeks; click/tap pins or closes it. The open hand scrolls horizontally without overlapping card text.
 - The center tray remains visible above the active playmat.
-- No page-level horizontal scrolling is required.
+- No page-level horizontal scrolling is required. On short screens, the board scrolls inside the viewport while the hand bar remains reachable.
 
 ## 7. Player playmat
 
@@ -162,7 +162,7 @@ Displays:
 - character portrait
 - player name
 - character name
-- HP shown as a d12-style tracker
+- HP shown as a d12-style tracker with Health directly above it, current/max HP and a health bar
 - status effects
 
 ### Draw pile
@@ -207,15 +207,16 @@ Card artwork contains no gameplay data. Names, symbols, text and numbers are ren
 
 ### Interaction
 
-- Hover or focus raises and enlarges a card.
-- Click or tap selects it.
-- Targeted cards then highlight legal targets on the table.
-- Patchadin symbol conversion appears as a compact choice before target selection.
-- Card play animates toward the center play area, resolves, then moves to its destination.
+- Hover shows a large, viewport-bounded preview outside the hand's clipping container.
+- Click/tap opens a readable card reference, including skill rules and flavor text. An explicit Play button commits the selection.
+- Own hand cards and all face-up public cards can be inspected. Opponent hands remain private.
+- Targeted cards show named legal choices and the card's complete effect text.
+- Only Judgment offers Can Do Everything symbol conversion before target selection.
+- Card play resolves and updates health, persistent zones and the combat log.
 - Defense cards remain in the active Defense zone.
 - Other resolved cards move to the discard pile.
 
-Dragging is visual enhancement only. Click and tap remain sufficient to complete every action.
+Keyboard controls, click and tap are sufficient. Escape closes optional overlays and the hand. Menu pauses automated play and preserves pending choices; Resume returns to the same match. Ending a match requires explicit confirmation. Full screen toggles through the browser API, with a visible unsupported state where unavailable.
 
 ## 9. Card art pipeline
 
@@ -265,7 +266,7 @@ The card resolves through the rules engine:
 - Play Again
 - card-specific text
 - saving throws
-- triggered character abilities
+- skills printed on the played card
 - persistent effects
 
 ### End phase
@@ -296,7 +297,11 @@ Each Draw symbol draws 1 card.
 
 ### Play Again
 
-Each Play Again symbol grants 1 additional mandatory action.
+Each Play Again value grants that many additional mandatory actions. A forced play with an empty hand draws two cards before continuing.
+
+Digital cards display a single icon per effect with its value overlaid in bold outlined numerals, following the V2 brief. The repeated symbols in deck documents are design notation.
+
+With 5 or 6 living participants, standard attacks follow Zone of Influence: nearest living neighbor on either side. Area effects and Mighty Powers are exempt, and explicit forced targets override normal selection.
 
 ## 12. Dice
 
@@ -310,7 +315,7 @@ Used for:
 - saving throws
 
 Natural 20 always succeeds on a saving throw.
-Natural 1 always fails.
+Natural 1 always fails on a saving throw. Initiative has no success/failure: compare rolls, reroll only tied leaders until one wins, then continue clockwise.
 
 ### d6
 
@@ -366,6 +371,8 @@ Signature abilities:
 - Can Do Everything
 - Developer's Favorite
 
+The six signature skills are attached to specific playable cards, not free buttons or permanent character passives. See [PLAYTEST_CHANGES.md](PLAYTEST_CHANGES.md) for exact mappings, timing and design rationale. Other printed deck mechanics remain intact.
+
 ## 14. Computer player
 
 Single Player uses a deterministic heuristic computer player.
@@ -375,7 +382,7 @@ The first implementation makes decisions from visible game state and its own han
 Priority model:
 
 1. prevent immediate elimination
-2. use required character abilities at useful targets
+2. use card-bound skills at useful targets; no free character-power activation
 3. heal when damaged
 4. establish Defense when exposed
 5. use high-value draw and utility cards
@@ -513,7 +520,7 @@ The game does not silently invent:
 - missing characters
 - missing targets
 
-The current source material does not define a draw-pile reshuffle rule. Drawing from an empty pile therefore fails visibly until that rule is explicitly designed.
+The complete shared rules define discard-pile recycling on an empty draw pile and a two-card refill when a mandatory play meets an empty hand. If no cards remain available, resolve as much as possible. The browser implements these rules.
 
 ## 20. Testing requirements
 
@@ -526,7 +533,7 @@ Before a browser build is considered ready:
 - single-player AI can complete legal turns
 - hotseat handoff hides private hands
 - Defense absorbs and spills damage correctly
-- survival abilities trigger once
+- Developer's Favorite requires its card, expires at the next turn and rescues only once per match
 - mandatory Play Again actions cannot be skipped
 - all decision queues resolve in order
 - static entry files load from GitHub Pages paths

@@ -22,17 +22,17 @@ export class CardRenderer {
         const theme_class = this.get_theme_class(definition.character_id);
         const type_class = this.get_type_class(definition.type);
         const spread_offset = card_index - ((card_count - 1) / 2);
-        const rotation = Math.max(-8, Math.min(8, spread_offset * 2.1));
-        const disabled = enabled ? "" : "disabled";
+        const rotation = Math.max(-3, Math.min(3, spread_offset));
 
         return `
             <button
                 type="button"
                 class="game-card hand-card ${theme_class} ${type_class}"
                 style="--hand-rotation: ${rotation}deg; --hand-index: ${card_index};"
-                data-action="select-card"
+                data-action="inspect-card"
+                data-card-definition-id="${this.escape_html(definition.id)}"
                 data-card-instance-id="${this.escape_html(card.instance_id)}"
-                ${disabled}>
+                aria-label="Read ${this.escape_html(definition.name)}${enabled ? ', then choose Play' : ''}">
                 ${this.render_card_face(definition)}
             </button>
         `;
@@ -41,19 +41,19 @@ export class CardRenderer {
     render_table_card_from_definition(definition_id, extra_class = "") {
         const definition = get_card_definition(definition_id);
         return `
-            <div class="game-card table-card ${this.get_theme_class(definition.character_id)} ${this.get_type_class(definition.type)} ${extra_class}">
+            <button type="button" data-action="inspect-card" data-card-definition-id="${this.escape_html(definition_id)}" aria-label="Read ${this.escape_html(definition.name)}" class="game-card table-card ${this.get_theme_class(definition.character_id)} ${this.get_type_class(definition.type)} ${extra_class}">
                 ${this.render_card_face(definition)}
-            </div>
+            </button>
         `;
     }
 
     render_mini_card_from_definition(definition_id) {
         const definition = get_card_definition(definition_id);
         return `
-            <div class="mini-card ${this.get_theme_class(definition.character_id)} ${this.get_type_class(definition.type)}">
+            <button type="button" data-action="inspect-card" data-card-definition-id="${this.escape_html(definition_id)}" aria-label="Read ${this.escape_html(definition.name)}" class="mini-card ${this.get_theme_class(definition.character_id)} ${this.get_type_class(definition.type)}">
                 <div class="mini-card-art">${this.render_art_motif(definition)}</div>
                 <div class="mini-card-name">${this.escape_html(definition.name)}</div>
-            </div>
+            </button>
         `;
     }
 
@@ -105,7 +105,7 @@ export class CardRenderer {
                     ${this.render_art_motif(definition)}
                 </div>
                 <div class="card-symbol-row">${this.render_symbols(definition.symbols)}</div>
-                <div class="card-rule-box">${this.escape_html(definition.rules_text)}</div>
+                <div class="card-rule-box">${this.escape_html(definition.rules_text)}${definition.skill === null ? '' : `<div class="card-skill"><strong>${this.escape_html(definition.skill.name)}</strong> ${this.escape_html(definition.skill.description)}</div>`}</div>
                 <div class="card-flavor-box">"${this.escape_html(definition.flavor_text)}"</div>
             </div>
         `;
@@ -130,8 +130,9 @@ export class CardRenderer {
     render_symbols(symbols) {
         const parts = [];
         for (const symbol_name of ["attack", "defense", "healing", "draw", "play_again"]) {
-            for (let symbol_number = 0; symbol_number < symbols[symbol_name]; symbol_number += 1) {
-                parts.push(`<span class="card-symbol symbol-${symbol_name}">${SYMBOL_GLYPHS[symbol_name]}</span>`);
+            if (symbols[symbol_name] > 0) {
+                const label = `${symbols[symbol_name]} ${symbol_name.replaceAll('_', ' ')}`;
+                parts.push(`<span class="card-symbol symbol-${symbol_name}" role="img" aria-label="${label}" title="${label}"><span class="symbol-glyph" aria-hidden="true">${SYMBOL_GLYPHS[symbol_name]}</span><strong class="symbol-value" aria-hidden="true">${symbols[symbol_name]}</strong></span>`);
             }
         }
 

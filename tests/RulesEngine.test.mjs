@@ -102,7 +102,8 @@ test("match setup gives every player 12 HP and a three-card opening hand", () =>
 
     assert.equal(game.game_state.phase, PHASES.INITIATIVE);
     for (const player of game.game_state.players) {
-        assert.equal(player.hp, STARTING_HP);
+        assert.equal(player.hp, 12);
+        assert.equal(player.max_hp, 12);
         assert.equal(player.hand.length, 3);
         assert.equal(player.deck.length, 25);
     }
@@ -184,13 +185,17 @@ test("played card definition is retained for table presentation", () => {
     assert.equal(grandpa.last_played_card_definition_id, "grandpa_8_bit_blast");
 });
 
-test("Developer's Favorite prevents Patchadin's first elimination only", () => {
+test("Developer's Favorite protects only after its card is played, once per match", () => {
     const game = create_game([
         human("Patchadin", CHARACTER_IDS.PATCHADIN),
         human("Grandpa", CHARACTER_IDS.GRANDPA),
     ]);
     const patchadin = game.game_state.players[0];
     const attacker = game.game_state.players[1];
+    complete_two_player_initiative(game);
+    game.turn_handler.reveal_active_turn(patchadin.id);
+    const favoritism = move_definition_to_hand(patchadin, "patchadin_blatant_favoritism");
+    game.rules_engine.play_card(patchadin.id, favoritism.instance_id, player_target(attacker.id), null);
 
     game.rules_engine.apply_damage_to_player(patchadin.id, 20, attacker.id, {
         is_attack: true,
@@ -208,24 +213,32 @@ test("Developer's Favorite prevents Patchadin's first elimination only", () => {
     assert.equal(patchadin.eliminated, true);
 });
 
-test("Second Wind triggers once when Malric reaches four HP or less", () => {
-    const game = create_game([
-        human("Malric", CHARACTER_IDS.MALRIC),
-        human("Grandpa", CHARACTER_IDS.GRANDPA),
-    ]);
-    const malric = game.game_state.players[0];
-    const attacker = game.game_state.players[1];
-    const hand_before = malric.hand.length;
+test("Second Wind is a low-health bonus on Inspiring Presence, never a passive rescue", () => {
+    for (const starting_hp of [4, 5]) {
+        const game = create_game([human("Malric", CHARACTER_IDS.MALRIC), human("Grandpa", CHARACTER_IDS.GRANDPA)]);
+        complete_two_player_initiative(game);
+        const malric = game.game_state.get_active_player();
+        game.turn_handler.reveal_active_turn(malric.id);
+        malric.hp = starting_hp;
+        const card = move_definition_to_hand(malric, "malric_inspiring_presence");
+        const hand_before = malric.hand.length;
+        game.rules_engine.play_card(malric.id, card.instance_id, null, null);
+        assert.equal(malric.hp, starting_hp === 4 ? 10 : 9);
+        assert.equal(malric.hand.length, hand_before - 1 + 2);
+    }
+});
 
-    game.rules_engine.apply_damage_to_player(malric.id, 8, attacker.id, {
-        is_attack: true,
-        is_dice_attack: false,
-        source_name: "Test hit",
-    });
-
-    assert.equal(malric.hp, 10);
-    assert.equal(malric.second_wind_used, true);
-    assert.equal(malric.hand.length, hand_before + 2);
+test("taking damage never grants unplayed character skills", () => {
+    for (const character_id of [CHARACTER_IDS.MALRIC, CHARACTER_IDS.PATCHADIN]) {
+        const game = create_game([human("Target", character_id), human("Grandpa", CHARACTER_IDS.GRANDPA)]);
+        const [target, attacker] = game.game_state.players;
+        game.rules_engine.apply_damage_to_player(target.id, 9, attacker.id, {is_attack: true, is_dice_attack: false, source_name: "Hit"});
+        assert.equal(target.hp, 3);
+        assert.equal(target.hand.length, 3);
+        game.rules_engine.apply_damage_to_player(target.id, 20, attacker.id, {is_attack: true, is_dice_attack: false, source_name: "Lethal hit"});
+        assert.equal(target.hp, 0);
+        assert.equal(target.eliminated, true);
+    }
 });
 
 test("Play Again creates mandatory actions", () => {
@@ -266,21 +279,23 @@ test("failed Boring Story save creates an explicit discard decision", () => {
     assert.equal(game.game_state.get_current_decision(), null);
 });
 
-test("Patchadin can convert a Healing symbol into Defense once per turn", () => {
-    const game = create_game([
-        human("Patchadin", CHARACTER_IDS.PATCHADIN),
-        human("Grandpa", CHARACTER_IDS.GRANDPA),
-    ]);
+test("Can Do Everything changes only Judgment, preserving its other effects", () => {
+    const game = create_game([human("Patchadin", CHARACTER_IDS.PATCHADIN), human("Grandpa", CHARACTER_IDS.GRANDPA)]);
     complete_two_player_initiative(game);
     const patchadin = game.game_state.get_active_player();
-    patchadin.hp = 5;
+    const opponent = game.game_state.get_living_opponents(patchadin.id)[0];
     game.turn_handler.reveal_active_turn(patchadin.id);
     const flash = move_definition_to_hand(patchadin, "patchadin_flash_of_light");
-    game.rules_engine.play_card(patchadin.id, flash.instance_id, null, { from: "healing", to: "defense" });
-
-    assert.equal(patchadin.hp, 7);
-    assert.equal(patchadin.defenses.length, 1);
+    assert.deepEqual(game.rules_engine.get_available_symbol_conversions(patchadin.id, flash.instance_id), []);
+    assert.throws(() => game.rules_engine.play_card(patchadin.id, flash.instance_id, null, {from: "healing", to: "defense"}), /only applies to the Judgment/);
+    assert.equal(game.game_state.actions_remaining, 1);
+    const judgment = move_definition_to_hand(patchadin, "patchadin_judgment");
+    const hand_before = patchadin.hand.length;
+    assert.equal(game.rules_engine.get_available_symbol_conversions(patchadin.id, judgment.instance_id).length, 2);
+    game.rules_engine.play_card(patchadin.id, judgment.instance_id, player_target(opponent.id), {from: "attack", to: "defense"});
+    assert.equal(opponent.hp, 11);
     assert.equal(patchadin.defenses[0].current_shields, 1);
+    assert.equal(patchadin.hand.length, hand_before);
 });
 
 test("Screen Saver returns to hand when its shield breaks", () => {
@@ -337,11 +352,236 @@ test("computer player completes a legal Malric turn", () => {
     assert.equal(game_state.get_active_player().player_type, PLAYER_TYPES.HUMAN);
 });
 
-test("deck exhaustion fails visibly because no reshuffle rule exists", () => {
-    const deck_handler = new DeckHandler(fixed_random(0.5));
-    const player = { name: "Tester", deck: [], hand: [] };
-    assert.throws(
-        () => deck_handler.draw_cards(player, 1),
-        /draw pile is empty and the project rules do not define a reshuffle rule/
-    );
+test("empty draw piles recycle discards; unavailable draws resolve as far as possible", () => {
+    const deck_handler = new DeckHandler(fixed_random(.5));
+    const cards = [{instance_id:"a"}, {instance_id:"b"}];
+    const player = {name:"Tester", deck:[], hand:[], discard:[...cards], defenses:[]};
+    assert.equal(deck_handler.draw_cards(player, 3).length, 2);
+    assert.equal(player.deck_recycles, 1);
+    assert.equal(player.discard.length, 0);
+    assert.equal(new Set(player.hand.map(c => c.instance_id)).size, 2);
+    assert.equal(deck_handler.draw_cards(player, 1).length, 0);
+});
+
+
+test("repeated highest ties exclude lower rolls and preserve clockwise seats", () => {
+    const game = create_game([
+        human("Grandpa", CHARACTER_IDS.GRANDPA), human("Malric", CHARACTER_IDS.MALRIC), human("Patchadin", CHARACTER_IDS.PATCHADIN)
+    ], [.95, .95, .9, .1, .1, 0, .05]);
+    for (let i = 0; i < 3; i++) game.turn_handler.roll_initiative(game.game_state.get_next_initiative_player().id);
+    assert.deepEqual(game.game_state.initiative_candidate_player_ids, ["player_1", "player_2"]);
+    for (let i = 0; i < 2; i++) game.turn_handler.roll_initiative(game.game_state.get_next_initiative_player().id);
+    assert.equal(game.game_state.initiative_round, 3);
+    for (let i = 0; i < 2; i++) game.turn_handler.roll_initiative(game.game_state.get_next_initiative_player().id);
+    assert.deepEqual(game.game_state.players.map(p => p.name), ["Malric", "Patchadin", "Grandpa"]);
+    assert.deepEqual(game.game_state.players.find(p => p.name === "Patchadin").initiative_history, [19]);
+    assert.ok(game.game_state.event_log.filter(e => e.tone === "dice").every(e => !/succeed|fail/i.test(e.message)));
+});
+
+test("all six signature skills are printed on cards that also have normal effects", () => {
+    const skills = [];
+    for (const character_id of Object.values(CHARACTER_IDS)) {
+        for (const card of get_card_definitions_for_character(character_id)) {
+            if (card.skill === null) continue;
+            skills.push(card.skill.id);
+            assert.ok(Object.values(card.symbols).some(count => count > 0));
+            assert.ok(card.skill.description.length > 30);
+            assert.ok(card.flavor_text.length > 0);
+        }
+    }
+    assert.deepEqual(skills.sort(), ["can_do_everything", "developers_favorite", "monochrome_lecture", "screen_burn_in", "second_wind", "threat_generation"]);
+});
+
+test("Monochrome Lecture resolves only with Back In My Day; save outcomes are explicit", () => {
+    for (const [save, blocked] of [[0,1], [.55,1], [.6,0], [.95,0]]) {
+        const game = create_game([human("Grandpa", CHARACTER_IDS.GRANDPA), human("Malric", CHARACTER_IDS.MALRIC)], [.95,.1,save]);
+        complete_two_player_initiative(game);
+        const [grandpa, malric] = game.game_state.players;
+        game.turn_handler.reveal_active_turn(grandpa.id);
+        assert.equal(malric.hp, 12);
+        const card = move_definition_to_hand(grandpa, "grandpa_back_in_my_day");
+        const hand_before = grandpa.hand.length;
+        game.rules_engine.play_card(grandpa.id, card.instance_id, player_target(malric.id), null);
+        assert.equal(malric.hp, 11);
+        assert.equal(malric.skip_next_play_again_count, blocked);
+        assert.equal(malric.outgoing_attack_reductions.length, 1);
+        assert.equal(grandpa.hand.length, hand_before);
+        assert.equal(game.game_state.actions_remaining, 0);
+    }
+});
+
+test("Screen Burn-In belongs to Grayscale Bomb, not ordinary attacks", () => {
+    const game = create_game([human("Grandpa", CHARACTER_IDS.GRANDPA), human("Malric", CHARACTER_IDS.MALRIC), human("Patchadin", CHARACTER_IDS.PATCHADIN)], [.95,.1,.2]);
+    for (let i = 0; i < 3; i++) game.turn_handler.roll_initiative(game.game_state.get_next_initiative_player().id);
+    const [grandpa, malric, patchadin] = game.game_state.players;
+    game.turn_handler.reveal_active_turn(grandpa.id);
+    const attack = move_definition_to_hand(grandpa, "grandpa_8_bit_blast");
+    game.rules_engine.play_card(grandpa.id, attack.instance_id, player_target(malric.id), null);
+    assert.equal(game.game_state.get_current_decision(), null);
+    assert.equal(malric.hp, 10);
+    game.game_state.actions_remaining = 1;
+    const bomb = move_definition_to_hand(grandpa, "grandpa_grayscale_bomb");
+    game.rules_engine.play_card(grandpa.id, bomb.instance_id, null, null);
+    const decision = game.game_state.get_current_decision();
+    assert.equal(decision.type, DECISION_TYPES.SCREEN_BURN_TARGET);
+    assert.equal(malric.hp, 8);
+    assert.equal(patchadin.hp, 10);
+    game.rules_engine.resolve_decision(decision.id, grandpa.id, {target_player_id: patchadin.id});
+    assert.equal(patchadin.hp, 9);
+    assert.equal(game.game_state.get_current_decision(), null);
+});
+
+test("Aggressive Positioning grants a shield and card-bound Threat Generation", () => {
+    const game = create_game([human("Malric", CHARACTER_IDS.MALRIC), human("Grandpa", CHARACTER_IDS.GRANDPA)]);
+    complete_two_player_initiative(game);
+    const [malric, grandpa] = game.game_state.players;
+    game.turn_handler.reveal_active_turn(malric.id);
+    assert.equal(grandpa.forced_attack_target_player_id, null);
+    const card = move_definition_to_hand(malric, "malric_aggressive_positioning");
+    game.rules_engine.play_card(malric.id, card.instance_id, player_target(grandpa.id), null);
+    assert.equal(malric.defenses[0].current_shields, 1);
+    assert.equal(grandpa.forced_attack_target_player_id, malric.id);
+    const hand_before = malric.hand.length;
+    game.turn_handler.end_turn(malric.id);
+    game.turn_handler.reveal_active_turn(grandpa.id);
+    const attack = move_definition_to_hand(grandpa, "grandpa_8_bit_blast");
+    game.rules_engine.play_card(grandpa.id, attack.instance_id, player_target(malric.id), null);
+    assert.equal(malric.hp, 11);
+    assert.equal(malric.hand.length, hand_before + 1);
+    assert.equal(grandpa.forced_attack_target_player_id, null);
+});
+
+test("Developer's Favorite expires at the next turn if unused", () => {
+    const game = create_game([human("Patchadin", CHARACTER_IDS.PATCHADIN), human("Grandpa", CHARACTER_IDS.GRANDPA)]);
+    complete_two_player_initiative(game);
+    const [patchadin, grandpa] = game.game_state.players;
+    game.turn_handler.reveal_active_turn(patchadin.id);
+    const card = move_definition_to_hand(patchadin, "patchadin_blatant_favoritism");
+    game.rules_engine.play_card(patchadin.id, card.instance_id, player_target(grandpa.id), null);
+    assert.equal(patchadin.developers_favorite_activated_turn, 1);
+    game.game_state.turn_number += 2;
+    game.rules_engine.on_start_turn(patchadin.id);
+    assert.equal(patchadin.developers_favorite_activated_turn, null);
+    game.rules_engine.apply_damage_to_player(patchadin.id, 20, grandpa.id, {is_attack: true, is_dice_attack: false, source_name: "Hit"});
+    assert.equal(patchadin.eliminated, true);
+});
+
+test("healing never exceeds twelve HP", () => {
+    const game = create_game([human("Grandpa", CHARACTER_IDS.GRANDPA), human("Malric", CHARACTER_IDS.MALRIC)]);
+    const player = game.game_state.players[0];
+    player.hp = 8;
+    game.rules_engine.heal_player(player.id, 100, "test");
+    assert.equal(player.hp, 12);
+});
+
+test("v2 Patchadin includes its corrected 28-card list", () => {
+    const cards = get_card_definitions_for_character(CHARACTER_IDS.PATCHADIN);
+    const count = id => cards.find(card => card.id === id)?.copies ?? 0;
+    assert.equal(count("patchadin_blatant_favoritism"), 2);
+    assert.equal(count("patchadin_blessing_of_kings"), 1);
+    assert.equal(count("patchadin_divine_intervention"), 1);
+    assert.equal(count("patchadin_wake_of_ashes"), 1);
+    assert.equal(count("patchadin_obvious_favoritism"), 0);
+    assert.equal(count("patchadin_paladins_op_at_everything"), 0);
+});
+
+test("Blatant Favoritism performs all four normal effects and arms its printed skill", () => {
+    const game = create_game([human("Patchadin", CHARACTER_IDS.PATCHADIN), human("Grandpa", CHARACTER_IDS.GRANDPA)]);
+    complete_two_player_initiative(game);
+    const [patchadin, grandpa] = game.game_state.players;
+    game.turn_handler.reveal_active_turn(patchadin.id);
+    patchadin.hp = 5;
+    const card = move_definition_to_hand(patchadin, "patchadin_blatant_favoritism");
+    const hand_before = patchadin.hand.length;
+    game.rules_engine.play_card(patchadin.id, card.instance_id, player_target(grandpa.id), null);
+    assert.equal(patchadin.hp, 6);
+    assert.equal(grandpa.hp, 10);
+    assert.equal(patchadin.defenses[0].current_shields, 1);
+    assert.equal(patchadin.hand.length, hand_before - 1);
+    assert.equal(game.game_state.actions_remaining, 1);
+    assert.equal(patchadin.developers_favorite_activated_turn, 1);
+});
+
+test("Divine Intervention sacrifices even Bubble Hearth, heals to maximum, and grants another play", () => {
+    const game = create_game([human("Patchadin", CHARACTER_IDS.PATCHADIN), human("Grandpa", CHARACTER_IDS.GRANDPA)]);
+    complete_two_player_initiative(game);
+    const patchadin = game.game_state.get_active_player();
+    game.turn_handler.reveal_active_turn(patchadin.id);
+    const bubble = move_definition_to_hand(patchadin, "patchadin_bubble_hearth");
+    game.rules_engine.play_card(patchadin.id, bubble.instance_id, null, null);
+    game.game_state.actions_remaining = 1;
+    patchadin.hp = 1;
+    const intervention = move_definition_to_hand(patchadin, "patchadin_divine_intervention");
+    game.rules_engine.play_card(patchadin.id, intervention.instance_id, null, null);
+    assert.equal(patchadin.hp, 12);
+    assert.equal(patchadin.defenses.length, 0);
+    assert.equal(patchadin.discard.some(card => card.instance_id === bubble.instance_id), true);
+    assert.equal(game.game_state.actions_remaining, 1);
+});
+
+test("Wake of Ashes hits all opponents but cancels only the chosen opponent's next extra play", () => {
+    const game = create_game([human("Patchadin", CHARACTER_IDS.PATCHADIN), human("Grandpa", CHARACTER_IDS.GRANDPA), human("Malric", CHARACTER_IDS.MALRIC)], [.95,.1,.2]);
+    for (let i=0; i<3; i++) game.turn_handler.roll_initiative(game.game_state.get_next_initiative_player().id);
+    const [patchadin, grandpa, malric] = game.game_state.players;
+    game.turn_handler.reveal_active_turn(patchadin.id);
+    const card = move_definition_to_hand(patchadin, "patchadin_wake_of_ashes");
+    assert.equal(game.rules_engine.get_legal_targets(patchadin.id, card.instance_id, null).length, 2);
+    game.rules_engine.play_card(patchadin.id, card.instance_id, player_target(grandpa.id), null);
+    assert.equal(grandpa.hp, 11);
+    assert.equal(malric.hp, 11);
+    assert.equal(grandpa.skip_next_play_again_count, 1);
+    assert.equal(malric.skip_next_play_again_count, 0);
+});
+
+test("an empty hand with mandatory plays draws two and cannot skip its actions", () => {
+    const game = create_game([human("Grandpa", CHARACTER_IDS.GRANDPA), human("Malric", CHARACTER_IDS.MALRIC)]);
+    complete_two_player_initiative(game);
+    const player = game.game_state.get_active_player();
+    game.turn_handler.reveal_active_turn(player.id);
+    const refresh = move_definition_to_hand(player, "grandpa_refresh_rate");
+    player.discard.push(...player.hand.filter(card => card.instance_id !== refresh.instance_id));
+    player.hand = [refresh];
+    game.rules_engine.play_card(player.id, refresh.instance_id, null, null);
+    assert.equal(player.hand.length, 2);
+    assert.equal(game.game_state.actions_remaining, 2);
+    assert.equal(game.turn_handler.can_end_turn(), false);
+});
+
+test("five-player standard attacks obey adjacency while control and area effects remain unrestricted", () => {
+    const game = create_game(Array.from({length:5}, (_,i) => human("Seat "+i, CHARACTER_IDS.GRANDPA)), [.95,.1,.2,.3,.4]);
+    for (let i=0; i<5; i++) game.turn_handler.roll_initiative(game.game_state.get_next_initiative_player().id);
+    const player = game.game_state.get_active_player();
+    game.turn_handler.reveal_active_turn(player.id);
+    const attack = move_definition_to_hand(player, "grandpa_8_bit_blast");
+    assert.deepEqual(game.rules_engine.get_legal_targets(player.id, attack.instance_id, null).map(t => t.player_id), ["player_2","player_5"]);
+    const control = move_definition_to_hand(player, "grandpa_back_in_my_day");
+    assert.equal(game.rules_engine.get_legal_targets(player.id, control.instance_id, null).length, 4);
+    player.forced_attack_target_player_id = "player_3";
+    assert.deepEqual(game.rules_engine.get_legal_targets(player.id, attack.instance_id, null).map(t => t.player_id), ["player_3"]);
+});
+
+test("automated matches preserve turn progress and HP bounds with the revised decks", () => {
+    for (let seed=1; seed<=12; seed++) {
+        let state = seed;
+        const random = () => {state = (1664525 * state + 1013904223) >>> 0; return state / 4294967296;};
+        const deck = new DeckHandler(random);
+        const game_state = new GameState(deck);
+        const rules = new RulesEngine(game_state, new DiceHandler(random));
+        const turns = new TurnHandler(game_state, rules);
+        const ai = new AIPlayerHandler(game_state, rules, turns);
+        turns.start_match(Array.from({length:seed % 2 ? 3 : 6}, (_,i) => computer("CPU "+i, Object.values(CHARACTER_IDS)[i%3])), GAME_MODES.SINGLE_PLAYER);
+        for (let guard=0; guard<1500 && game_state.phase !== PHASES.GAME_OVER; guard++) {
+            if (game_state.phase === PHASES.INITIATIVE) turns.roll_initiative(game_state.get_next_initiative_player().id);
+            else if (game_state.phase === PHASES.HANDOFF) turns.reveal_active_turn(game_state.get_active_player().id);
+            else {
+                const turn_before = game_state.turn_number;
+                ai.take_active_turn();
+                assert.ok(game_state.phase === PHASES.GAME_OVER || game_state.turn_number > turn_before, "CPU must complete its turn: seed "+seed);
+            }
+        }
+        // Tank mirrors can outlast this bounded simulation; that is a balance finding,
+        // not permission to alter printed defense rules or introduce sudden death.
+        assert.ok(game_state.phase === PHASES.GAME_OVER || game_state.turn_number > 200);
+        for (const player of game_state.players) assert.ok(player.hp >= 0 && player.hp <= 12);
+    }
 });

@@ -23,6 +23,18 @@ Then open `http://localhost:8000/`.
 
 Every match begins with a visible d20 initiative roll. Highest roll takes the first turn. Highest ties reroll.
 
+The d12 at each seat is labeled Health and tracks current HP; it is not rolled. Initiative has no success/failure. Saving throws use the DC printed on the card.
+
+## Table controls
+
+- Hover over Your hand to peek; move away to close. Click/tap pins it open or closes it.
+- Hover a face-up card for a large preview. Click/tap to read its full rules and flavor text; choose Play to use a hand card.
+- Card skills at each seat explains the cards carrying that character's special effects. Opponents' private hands are never exposed.
+- Menu pauses the current match. Resume preserves hands, turns and pending choices. Ending a match requires confirmation.
+- Full screen is available on supported browsers. The hand bar remains in the viewport on desktop and mobile; smaller screens can scroll the board and swipe opponent seats.
+
+See [PLAYTEST_CHANGES.md](PLAYTEST_CHANGES.md) for the six card-bound skill mappings and preserved custom mechanics.
+
 ## Current playable content
 
 - Grandpa the Grayscale
@@ -68,4 +80,6 @@ npm test
 
 The validation workflow also syntax-checks every JavaScript module.
 
-The browser build intentionally fails when a draw is requested from an empty draw pile. The current project rules do not define a reshuffle rule, so the implementation does not invent one.
+For interactive browser regression checks, install Playwright and Chrome, start the local server on port 8765, then run `node tests/browser.smoke.mjs`. Alternatively, set `TEST_URL`, `PLAYWRIGHT_MODULE` and `BROWSER_CHANNEL` for your environment. This checks desktop, portrait/landscape mobile, large hands, six-player seating, public-card reading, actual damage, pause/resume, full screen and explicit quit. Screenshots are generated in the system temporary directory.
+
+An empty draw pile recycles its discard pile. If a mandatory play meets an empty hand, draw two and continue. With five or six living players, standard attacks target the nearest living neighbor on either side; area effects and Mighty Powers are exempt. See PLAYTEST_CHANGES.md for V2 deck corrections and remaining playtest limits.

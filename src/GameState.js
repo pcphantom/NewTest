@@ -121,11 +121,8 @@ export class GameState {
             tank_specs_activated_turn: null,
             blessing_of_kings_activated_turn: null,
             vengeance_activated_turn: null,
-            second_wind_used: false,
             developers_favorite_used: false,
-            monochrome_lecture_used_this_turn: false,
-            threat_generation_used_this_turn: false,
-            can_do_everything_used_this_turn: false,
+            developers_favorite_activated_turn: null,
             cards_played_this_turn: 0,
         };
     }

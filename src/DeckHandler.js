@@ -65,7 +65,10 @@ export class DeckHandler {
 
         for (let draw_number = 0; draw_number < card_count; draw_number += 1) {
             if (player.deck.length === 0) {
-                throw new Error(`${player.name} cannot draw: draw pile is empty and the project rules do not define a reshuffle rule.`);
+                if (player.discard.length === 0) break;
+                player.deck = this.shuffle_cards(player.discard);
+                player.discard = [];
+                player.deck_recycles = (player.deck_recycles ?? 0) + 1;
             }
 
             const card = player.deck.pop();
