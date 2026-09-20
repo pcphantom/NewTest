@@ -4,6 +4,8 @@
    Stays out of: gameplay logic and presentation details.
    ===================================================================== */
 
+import { AIPlayerHandler } from "./AIPlayerHandler.js";
+import { CardRenderer } from "./CardRenderer.js";
 import { DeckHandler } from "./DeckHandler.js";
 import { DiceHandler } from "./DiceHandler.js";
 import { GameState } from "./GameState.js";
@@ -17,11 +19,14 @@ const dice_handler = new DiceHandler(Math.random);
 const game_state = new GameState(deck_handler);
 const rules_engine = new RulesEngine(game_state, dice_handler);
 const turn_handler = new TurnHandler(game_state, rules_engine);
-const ui_handler = new UIHandler(document);
+const ai_player_handler = new AIPlayerHandler(game_state, rules_engine, turn_handler);
+const card_renderer = new CardRenderer();
+const ui_handler = new UIHandler(document, card_renderer);
 const input_handler = new InputHandler(
     game_state,
     rules_engine,
     turn_handler,
+    ai_player_handler,
     ui_handler,
     window
 );

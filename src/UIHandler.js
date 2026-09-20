@@ -1,29 +1,35 @@
 /* =====================================================================
    UIHandler
-   Owns: HTML rendering from current state.
-   Stays out of: input events and gameplay mutations.
+   Owns: screen and tabletop HTML rendering.
+   Stays out of: gameplay mutation and browser input handling.
    ===================================================================== */
 
 import {
     CHARACTER_ABILITY_IDS,
     CHARACTER_IDS,
-    COMPLETED_CHARACTER_COUNT,
     DECISION_TYPES,
+    GAME_MODES,
     MAX_PLAYERS,
+    MENU_SCREENS,
     MIN_PLAYERS,
     PHASES,
+    PLAYER_TYPES,
     SYMBOL_GLYPHS,
 } from "./Constants.js";
 import { get_character_definition, get_character_list } from "./CharacterData.js";
 import { get_card_definition } from "./CardData.js";
 
 export class UIHandler {
-    constructor(document_reference) {
+    constructor(document_reference, card_renderer) {
         if (typeof document_reference !== "object" || document_reference === null) {
             throw new TypeError("UIHandler requires a document reference.");
         }
+        if (typeof card_renderer !== "object" || card_renderer === null) {
+            throw new TypeError("UIHandler requires a CardRenderer instance.");
+        }
 
         this.document = document_reference;
+        this.card_renderer = card_renderer;
         this.app_element = document_reference.getElementById("app");
         if (this.app_element === null) {
             throw new Error("Missing #app root element.");
@@ -32,7 +38,11 @@ export class UIHandler {
 
     render(game_state, rules_engine, turn_handler, view_state) {
         if (game_state.phase === PHASES.SETUP) {
-            this.render_setup(view_state);
+            this.render_menu(view_state);
+            return;
+        }
+        if (game_state.phase === PHASES.INITIATIVE) {
+            this.render_initiative(game_state);
             return;
         }
         if (game_state.phase === PHASES.HANDOFF) {
@@ -47,60 +57,240 @@ export class UIHandler {
             throw new Error(`Unsupported UI phase: ${game_state.phase}`);
         }
 
-        this.render_play_screen(game_state, rules_engine, turn_handler, view_state);
+        this.render_table(game_state, rules_engine, turn_handler, view_state);
     }
 
-    render_setup(view_state) {
+    render_menu(view_state) {
+        if (view_state.menu_screen === MENU_SCREENS.MAIN) {
+            this.render_main_menu();
+            return;
+        }
+        if (view_state.menu_screen === MENU_SCREENS.SINGLE_PLAYER_SETUP) {
+            this.render_single_player_setup(view_state);
+            return;
+        }
+        if (view_state.menu_screen === MENU_SCREENS.LOCAL_MULTIPLAYER_SETUP) {
+            this.render_local_multiplayer_setup(view_state);
+            return;
+        }
+        if (view_state.menu_screen === MENU_SCREENS.HOW_TO_PLAY) {
+            this.render_how_to_play();
+            return;
+        }
+
+        throw new Error(`Unknown menu screen: ${view_state.menu_screen}`);
+    }
+
+    render_main_menu() {
+        this.app_element.innerHTML = `
+            <main class="title-screen">
+                <section class="title-banner">
+                    <div class="title-eyebrow">Mini Multiplayer Offline RPG</div>
+                    <h1>Dungeons <span>&amp;</span> Mayhem</h1>
+                    <p>Python's Quest for the Holy Kale</p>
+                </section>
+
+                <section class="menu-board">
+                    <button type="button" class="menu-card single-player-menu" data-action="open-single-player">
+                        <span class="menu-card-icon">1P</span>
+                        <span class="menu-card-copy">
+                            <strong>Single Player</strong>
+                            <small>Play against computer-controlled opponents.</small>
+                        </span>
+                    </button>
+
+                    <button type="button" class="menu-card local-menu" data-action="open-local-multiplayer">
+                        <span class="menu-card-icon">2-6</span>
+                        <span class="menu-card-copy">
+                            <strong>Local Multiplayer</strong>
+                            <small>Hotseat play on one device.</small>
+                        </span>
+                    </button>
+
+                    <button type="button" class="menu-card rules-menu" data-action="open-how-to-play">
+                        <span class="menu-card-icon">?</span>
+                        <span class="menu-card-copy">
+                            <strong>How to Play</strong>
+                            <small>Objective, symbols, turns, dice and Defense.</small>
+                        </span>
+                    </button>
+                </section>
+            </main>
+        `;
+    }
+
+    render_single_player_setup(view_state) {
         const characters = get_character_list();
-        const character_options = characters.map((character) =>
-            `<option value="${this.escape_html(character.id)}">${this.escape_html(character.name)} | ${this.escape_html(character.archetype)}</option>`
+        const options = characters.map((character) =>
+            `<option value="${this.escape_html(character.id)}" ${character.id === view_state.single_player_character_id ? "selected" : ""}>${this.escape_html(character.name)} | ${this.escape_html(character.archetype)}</option>`
         ).join("");
 
-        const rows = view_state.setup_players.map((setup_player, player_index) => {
-            const options = character_options.replace(
-                `value="${this.escape_html(setup_player.character_id)}"`,
-                `value="${this.escape_html(setup_player.character_id)}" selected`
-            );
-            const remove_disabled = view_state.setup_players.length <= MIN_PLAYERS ? "disabled" : "";
+        this.app_element.innerHTML = `
+            <main class="setup-screen">
+                <section class="setup-panel">
+                    <button type="button" class="back-button" data-action="back-to-main">← Main Menu</button>
+                    <div class="screen-kicker">Single Player</div>
+                    <h1>Choose Your Character</h1>
+
+                    ${this.render_setup_error(view_state.setup_error)}
+
+                    <div class="character-select-preview">
+                        ${this.render_character_selector_cards(view_state.single_player_character_id)}
+                    </div>
+
+                    <div class="setup-form-grid">
+                        <label>
+                            <span>Player Name</span>
+                            <input type="text" maxlength="28" data-single-name value="${this.escape_html(view_state.single_player_name)}">
+                        </label>
+                        <label>
+                            <span>Character</span>
+                            <select data-single-character>${options}</select>
+                        </label>
+                        <label>
+                            <span>Total Players</span>
+                            <select data-single-player-count>
+                                ${this.render_player_count_options(view_state.single_player_count)}
+                            </select>
+                        </label>
+                    </div>
+
+                    <div class="setup-summary">
+                        You plus ${view_state.single_player_count - 1} computer opponent(s). Distinct completed decks are assigned before repeats.
+                    </div>
+
+                    <button type="button" class="primary-action" data-action="start-single-player">Roll Into Battle</button>
+                </section>
+            </main>
+        `;
+    }
+
+    render_local_multiplayer_setup(view_state) {
+        const rows = view_state.local_players.map((player, player_index) => {
+            const character_options = get_character_list().map((character) =>
+                `<option value="${this.escape_html(character.id)}" ${character.id === player.character_id ? "selected" : ""}>${this.escape_html(character.name)}</option>`
+            ).join("");
 
             return `
-                <div class="setup-player-row" data-setup-row="${player_index}">
-                    <div class="player-number">PLAYER ${player_index + 1}</div>
-                    <input
-                        type="text"
-                        maxlength="28"
-                        value="${this.escape_html(setup_player.name)}"
-                        data-setup-name="${player_index}"
-                        aria-label="Player ${player_index + 1} name">
-                    <select data-setup-character="${player_index}" aria-label="Player ${player_index + 1} character">
-                        ${options}
+                <div class="hotseat-player-row">
+                    <div class="seat-number">P${player_index + 1}</div>
+                    <input type="text" maxlength="28" data-local-name="${player_index}" value="${this.escape_html(player.name)}" aria-label="Player ${player_index + 1} name">
+                    <select data-local-character="${player_index}" aria-label="Player ${player_index + 1} character">
+                        ${character_options}
                     </select>
-                    <button type="button" data-action="remove-player" data-player-index="${player_index}" ${remove_disabled}>Remove</button>
                 </div>
             `;
         }).join("");
 
-        const duplicate_notice = view_state.setup_players.length > COMPLETED_CHARACTER_COUNT
-            ? `<div class="notice">The repository currently has ${COMPLETED_CHARACTER_COUNT} completed decks. Duplicate characters are enabled for this ${view_state.setup_players.length}-player local test.</div>`
-            : "";
-        const setup_error = view_state.setup_error === null
-            ? ""
-            : `<div class="error-banner">${this.escape_html(view_state.setup_error)}</div>`;
-        const add_disabled = view_state.setup_players.length >= MAX_PLAYERS ? "disabled" : "";
+        this.app_element.innerHTML = `
+            <main class="setup-screen">
+                <section class="setup-panel wide-setup">
+                    <button type="button" class="back-button" data-action="back-to-main">← Main Menu</button>
+                    <div class="screen-kicker">Local Multiplayer</div>
+                    <h1>Build the Table</h1>
+
+                    ${this.render_setup_error(view_state.setup_error)}
+
+                    <label class="player-count-control">
+                        <span>Players</span>
+                        <select data-local-player-count>
+                            ${this.render_player_count_options(view_state.local_player_count)}
+                        </select>
+                    </label>
+
+                    <div class="hotseat-player-list">${rows}</div>
+
+                    <button type="button" class="primary-action" data-action="start-local-multiplayer">Roll Initiative</button>
+                </section>
+            </main>
+        `;
+    }
+
+    render_how_to_play() {
+        this.app_element.innerHTML = `
+            <main class="rules-screen">
+                <section class="rules-sheet">
+                    <button type="button" class="back-button" data-action="back-to-main">← Main Menu</button>
+                    <div class="screen-kicker">Table Reference</div>
+                    <h1>How to Play</h1>
+
+                    <div class="rules-columns">
+                        <article>
+                            <h2>Goal</h2>
+                            <p>Reduce every opponent to 0 HP. The last living player is the Last Pixel Standing.</p>
+
+                            <h2>Setup</h2>
+                            <p>Choose a 28-card character deck, start at 12 HP, draw 3 cards, then roll a d20 for initiative. Highest roll goes first. Highest ties reroll.</p>
+
+                            <h2>Your Turn</h2>
+                            <ol>
+                                <li>Draw 1 card.</li>
+                                <li>Play 1 mandatory card.</li>
+                                <li>Use every Play Again action you gain.</li>
+                                <li>Resolve persistent and end-of-turn effects.</li>
+                            </ol>
+                        </article>
+
+                        <article>
+                            <h2>Core Symbols</h2>
+                            <div class="symbol-guide">
+                                <div><span>⚔️</span><strong>Attack</strong><small>1 damage each. Defense absorbs first.</small></div>
+                                <div><span>🛡️</span><strong>Defense</strong><small>1 shield each. Defense cards stay in play.</small></div>
+                                <div><span>❤️</span><strong>Healing</strong><small>Restore 1 HP each, up to 12.</small></div>
+                                <div><span>🃏</span><strong>Draw</strong><small>Draw 1 card each.</small></div>
+                                <div><span>⚡</span><strong>Play Again</strong><small>Gain 1 additional mandatory action.</small></div>
+                            </div>
+
+                            <h2>Dice</h2>
+                            <p>d20 rolls handle initiative and saving throws. Natural 20 succeeds. Natural 1 fails. Some cards use other dice.</p>
+                        </article>
+                    </div>
+                </section>
+            </main>
+        `;
+    }
+
+    render_initiative(game_state) {
+        const next_player = game_state.get_next_initiative_player();
+        const seats = game_state.players.map((player) => {
+            const history = player.initiative_history.map((roll) => `<span class="roll-history-value">${roll}</span>`).join("");
+            const active_class = next_player !== null && next_player.id === player.id ? "initiative-active" : "";
+            return `
+                <div class="initiative-seat ${active_class}">
+                    ${this.card_renderer.render_character_portrait(player.character_id, "portrait-medium")}
+                    <div class="initiative-seat-name">${this.escape_html(player.name)}</div>
+                    <div class="initiative-character-name">${this.escape_html(get_character_definition(player.character_id).name)}</div>
+                    <div class="initiative-die ${player.initiative_roll === null ? "" : "rolled"}">
+                        <span>d20</span>
+                        <strong>${player.initiative_roll === null ? "?" : player.initiative_roll}</strong>
+                    </div>
+                    <div class="initiative-history">${history}</div>
+                </div>
+            `;
+        }).join("");
+
+        let action = "";
+        if (next_player !== null) {
+            if (next_player.player_type === PLAYER_TYPES.HUMAN) {
+                action = `
+                    <button type="button" class="primary-action roll-button" data-action="roll-initiative" data-player-id="${this.escape_html(next_player.id)}">
+                        ${this.escape_html(next_player.name)}: Roll d20
+                    </button>
+                `;
+            } else {
+                action = `<div class="computer-thinking">Computer is reaching for the d20...</div>`;
+            }
+        }
 
         this.app_element.innerHTML = `
-            <main class="setup-shell panel">
-                <div class="title-kicker">Mini Multiplayer Offline RPG</div>
-                <h1>Dungeons &amp; Mayhem</h1>
-                <p class="subtitle">Local pass-and-play build using the three completed Python's Quest character decks. Every character starts at 12 HP. Cards use Attack, Defense, Healing, Draw, and Play Again as the shared rules language.</p>
-                ${setup_error}
-                ${duplicate_notice}
-                <div class="setup-grid">${rows}</div>
-                <div class="setup-actions">
-                    <button type="button" data-action="add-player" ${add_disabled}>Add Player</button>
-                    <button type="button" class="primary-button" data-action="start-match">Start Match</button>
-                </div>
-                <p class="muted" style="margin-top: 14px; margin-bottom: 0;">Players: ${view_state.setup_players.length} / ${MAX_PLAYERS}. The first configured player takes the first turn.</p>
+            <main class="initiative-screen">
+                <section class="initiative-tray">
+                    <div class="screen-kicker">Initiative Round ${game_state.initiative_round}</div>
+                    <h1>Roll for First Player</h1>
+                    <p>Highest d20 result takes the first turn. Highest ties reroll.</p>
+                    <div class="initiative-grid">${seats}</div>
+                    <div class="initiative-action">${action}</div>
+                </section>
             </main>
         `;
     }
@@ -109,306 +299,270 @@ export class UIHandler {
         const player = game_state.get_active_player();
         const character = get_character_definition(player.character_id);
 
-        this.app_element.innerHTML = `
-            <main class="handoff-screen panel ${this.escape_html(character.theme_class)}">
-                <div class="title-kicker">Turn ${game_state.turn_number} | Round ${game_state.round_number}</div>
-                <h1>Pass the device</h1>
-                <p class="handoff-name">${this.escape_html(player.name)}</p>
-                <p>${this.escape_html(character.name)}</p>
-                <p class="muted">The hand remains hidden until the active player reveals the turn.</p>
-                <button type="button" class="primary-button" data-action="reveal-turn" data-player-id="${this.escape_html(player.id)}">Reveal My Turn</button>
-            </main>
-        `;
-    }
-
-    render_game_over(game_state) {
-        if (game_state.winner_player_id === null) {
-            throw new Error("Game Over phase requires a winner_player_id.");
+        if (player.player_type === PLAYER_TYPES.COMPUTER) {
+            this.app_element.innerHTML = `
+                <main class="handoff-screen">
+                    <section class="handoff-card">
+                        ${this.card_renderer.render_character_portrait(player.character_id, "portrait-large")}
+                        <div class="screen-kicker">Turn ${game_state.turn_number}</div>
+                        <h1>${this.escape_html(player.name)}</h1>
+                        <p>${this.escape_html(character.name)}</p>
+                        <div class="computer-thinking">Computer turn in progress...</div>
+                    </section>
+                </main>
+            `;
+            return;
         }
 
-        const winner = game_state.get_player_by_id(game_state.winner_player_id);
-        const character = get_character_definition(winner.character_id);
-
         this.app_element.innerHTML = `
-            <main class="game-over-screen panel ${this.escape_html(character.theme_class)}">
-                <div class="title-kicker">Game Over</div>
-                <h1>Last Pixel Standing</h1>
-                <p class="handoff-name">${this.escape_html(winner.name)}</p>
-                <p>${this.escape_html(character.name)} wins with ${winner.hp} HP.</p>
-                <button type="button" class="primary-button" data-action="new-match">New Match</button>
+            <main class="handoff-screen">
+                <section class="handoff-card">
+                    ${this.card_renderer.render_character_portrait(player.character_id, "portrait-large")}
+                    <div class="screen-kicker">Turn ${game_state.turn_number} | Round ${game_state.round_number}</div>
+                    <h1>Pass to ${this.escape_html(player.name)}</h1>
+                    <p>${this.escape_html(character.name)}</p>
+                    <p class="muted">Your hand stays hidden until you reveal the table.</p>
+                    <button type="button" class="primary-action" data-action="reveal-turn" data-player-id="${this.escape_html(player.id)}">Reveal My Hand</button>
+                </section>
             </main>
         `;
     }
 
-    render_play_screen(game_state, rules_engine, turn_handler, view_state) {
+    render_table(game_state, rules_engine, turn_handler, view_state) {
         const active_player = game_state.get_active_player();
-        const active_character = get_character_definition(active_player.character_id);
-        const opponents = game_state.players.filter((player) => player.id !== active_player.id);
-        const opponent_panels = opponents.map((player) => this.render_player_summary(player, false)).join("");
-        const hand_cards = active_player.hand.map((card) => this.render_hand_card(card, game_state.actions_remaining > 0)).join("");
-        const can_end_turn = turn_handler.can_end_turn();
-        const active_abilities = this.render_active_ability_buttons(game_state, active_player);
-        const event_entries = [...game_state.event_log].reverse().map((event) => `
-            <div class="event-entry">
-                <span class="event-turn">T${event.turn_number}</span> ${this.escape_html(event.message)}
-            </div>
-        `).join("");
+        const opponent_seats = game_state.players
+            .filter((player) => player.id !== active_player.id)
+            .map((player) => this.render_player_playmat(player, false))
+            .join("");
+
+        const hand = active_player.player_type === PLAYER_TYPES.HUMAN
+            ? this.render_hand(active_player, game_state.actions_remaining > 0)
+            : '<div class="hidden-computer-hand">Computer hand is hidden.</div>';
+
+        const current_decision = game_state.get_current_decision();
 
         this.app_element.innerHTML = `
-            <main class="game-shell">
-                <header class="game-header panel">
-                    <div>
-                        <div class="title-kicker">Mini Multiplayer Offline RPG</div>
-                        <h1 class="game-title-small">Dungeons &amp; Mayhem</h1>
+            <main class="table-screen">
+                <header class="table-topbar">
+                    <button type="button" class="table-menu-button" data-action="return-to-main">Menu</button>
+                    <div class="turn-readout">
+                        <strong>Turn ${game_state.turn_number}</strong>
+                        <span>Round ${game_state.round_number}</span>
+                        <span>Actions ${game_state.actions_remaining}</span>
                     </div>
-                    <div class="turn-stats">
-                        <span class="stat-chip">Turn ${game_state.turn_number}</span>
-                        <span class="stat-chip">Round ${game_state.round_number}</span>
-                        <span class="stat-chip">Actions ${game_state.actions_remaining}</span>
-                        <span class="stat-chip">Deck ${active_player.deck.length}</span>
-                        <span class="stat-chip">Discard ${active_player.discard.length}</span>
-                    </div>
+                    <div class="mode-readout">${game_state.game_mode === GAME_MODES.SINGLE_PLAYER ? "Single Player" : "Local Multiplayer"}</div>
                 </header>
 
-                <div class="battle-grid">
-                    <section class="main-column">
-                        <div class="panel">
-                            <div class="zone-label">Opponents</div>
-                            <div class="opponents-grid">${opponent_panels}</div>
+                <section class="game-table">
+                    <div class="wood-edge wood-edge-top"></div>
+
+                    <div class="opponent-rail">
+                        ${opponent_seats}
+                    </div>
+
+                    <div class="table-center">
+                        <div class="center-dice-tray">
+                            <div class="dice-tray-label">TABLE</div>
+                            <div class="turn-orb">${game_state.actions_remaining}</div>
+                            <div class="dice-tray-copy">${this.escape_html(active_player.name)} is active</div>
                         </div>
-
-                        <div class="panel active-area">
-                            <div class="character-card ${this.escape_html(active_character.theme_class)}">
-                                <div class="player-heading">
-                                    <div>
-                                        <div class="title-kicker">Active Player</div>
-                                        <h2>${this.escape_html(active_player.name)} | ${this.escape_html(active_character.name)}</h2>
-                                        <div class="character-quote">"${this.escape_html(active_character.quote)}"</div>
-                                    </div>
-                                    <div class="hp-display">HP ${active_player.hp} / ${active_player.max_hp}</div>
-                                </div>
-                                <div class="zone-label">Signature Abilities</div>
-                                <div class="ability-list">
-                                    ${active_character.abilities.map((ability) => `
-                                        <div class="ability-item"><strong>${this.escape_html(ability.name)}</strong><br>${this.escape_html(ability.description)}</div>
-                                    `).join("")}
-                                </div>
-                                ${this.render_status_chips(active_player)}
-                            </div>
-
-                            <div>
-                                <div class="zone-label">Active Defenses</div>
-                                <div class="defense-row">${this.render_defenses(active_player)}</div>
-                            </div>
-
-                            <div>
-                                <div class="zone-label">Summons</div>
-                                <div class="summon-row">${this.render_summons(active_player)}</div>
-                            </div>
-
-                            <div>
-                                <div class="zone-label">Hand | ${active_player.hand.length} cards</div>
-                                <div class="hand-row">${hand_cards}</div>
-                            </div>
-
-                            <div class="turn-actions">
-                                ${active_abilities}
-                                <button type="button" data-action="end-turn" data-player-id="${this.escape_html(active_player.id)}" ${can_end_turn ? "" : "disabled"}>End Turn</button>
-                            </div>
+                        <div class="last-play-stage">
+                            ${active_player.last_played_card_definition_id === null
+                                ? '<div class="empty-last-play">Play area</div>'
+                                : this.card_renderer.render_table_card_from_definition(active_player.last_played_card_definition_id, "current-play-card")}
                         </div>
-                    </section>
+                    </div>
 
-                    <aside class="sidebar panel">
-                        <div class="zone-label">Combat Log</div>
-                        <div class="event-log">${event_entries}</div>
+                    <div class="active-playmat">
+                        ${this.render_player_playmat(active_player, true)}
+                    </div>
+
+                    <div class="hand-dock">
+                        <div class="hand-dock-label">
+                            <span>YOUR HAND</span>
+                            <span>${active_player.hand.length} CARDS</span>
+                        </div>
+                        <div class="hand-fan">${hand}</div>
+                        <div class="table-action-bar">
+                            ${this.render_active_ability_button(active_player)}
+                            <button type="button" data-action="end-turn" data-player-id="${this.escape_html(active_player.id)}" ${turn_handler.can_end_turn() ? "" : "disabled"}>End Turn</button>
+                        </div>
+                    </div>
+
+                    <aside class="combat-log-drawer">
+                        <details>
+                            <summary>Combat Log</summary>
+                            <div class="combat-log-list">
+                                ${[...game_state.event_log].reverse().slice(0, 20).map((event) =>
+                                    `<div><span>T${event.turn_number}</span> ${this.escape_html(event.message)}</div>`
+                                ).join("")}
+                            </div>
+                        </details>
                     </aside>
-                </div>
+                </section>
             </main>
         `;
 
-        const decision = game_state.get_current_decision();
-        if (decision !== null) {
-            this.app_element.insertAdjacentHTML("beforeend", this.render_decision_overlay(game_state, decision, view_state));
+        if (current_decision !== null) {
+            this.app_element.insertAdjacentHTML(
+                "beforeend",
+                this.render_decision_overlay(game_state, current_decision, view_state)
+            );
             return;
         }
 
         if (view_state.interaction !== null) {
-            this.app_element.insertAdjacentHTML("beforeend", this.render_interaction_overlay(game_state, rules_engine, view_state.interaction));
+            this.app_element.insertAdjacentHTML(
+                "beforeend",
+                this.render_interaction_overlay(game_state, rules_engine, view_state.interaction)
+            );
         }
     }
 
-    render_player_summary(player, is_active) {
+    render_player_playmat(player, is_active) {
         const character = get_character_definition(player.character_id);
-        const eliminated_class = player.eliminated ? "eliminated" : "";
-        const active_class = is_active ? "active-player" : "";
+        const discard_top = player.discard.length === 0
+            ? this.card_renderer.render_empty_discard()
+            : this.card_renderer.render_mini_card_from_definition(player.discard[player.discard.length - 1].definition_id);
+
+        const defenses = player.defenses.length === 0
+            ? '<div class="zone-empty">No active Defense</div>'
+            : player.defenses.map((defense) => `
+                <div class="defense-slot-card">
+                    ${this.card_renderer.render_table_card_from_definition(defense.card.definition_id, "defense-table-card")}
+                    <span class="shield-counter">🛡️ ${defense.current_shields}</span>
+                </div>
+            `).join("");
+
+        const summons = player.summons.length === 0
+            ? '<div class="zone-empty">No summons</div>'
+            : player.summons.map((summon) =>
+                `<div class="summon-token"><strong>${this.escape_html(summon.name)}</strong><span>${summon.hp}/${summon.max_hp} HP</span></div>`
+            ).join("");
+
+        const status_chips = this.render_status_chips(player);
+        const active_class = is_active ? "active-seat" : "";
+        const eliminated_class = player.eliminated ? "eliminated-seat" : "";
 
         return `
-            <article class="player-panel ${this.escape_html(character.theme_class)} ${active_class} ${eliminated_class}">
-                <div class="player-heading">
-                    <div>
-                        <h3>${this.escape_html(player.name)}</h3>
-                        <div class="muted">${this.escape_html(character.name)}</div>
+            <article class="player-playmat ${active_class} ${eliminated_class}">
+                <div class="seat-header">
+                    ${this.card_renderer.render_character_portrait(player.character_id, is_active ? "portrait-medium" : "portrait-small")}
+                    <div class="seat-identity">
+                        <strong>${this.escape_html(player.name)}</strong>
+                        <span>${this.escape_html(character.name)}</span>
                     </div>
-                    <div class="hp-display">HP ${player.hp} / ${player.max_hp}</div>
+                    <div class="hp-die" aria-label="${player.hp} hit points">
+                        <span>d12</span>
+                        <strong>${player.hp}</strong>
+                    </div>
                 </div>
-                <div class="zone-label">State</div>
-                <div class="muted">Hand ${player.hand.length} | Deck ${player.deck.length} | Discard ${player.discard.length}</div>
-                <div class="zone-label">Defense</div>
-                <div class="defense-row">${this.render_defenses(player)}</div>
-                <div class="zone-label">Summons</div>
-                <div class="summon-row">${this.render_summons(player)}</div>
-                ${this.render_status_chips(player)}
+
+                <div class="seat-zones">
+                    <div class="pile-zone">
+                        <div class="zone-label">Deck</div>
+                        ${this.card_renderer.render_card_back(player.character_id, player.deck.length)}
+                    </div>
+                    <div class="pile-zone">
+                        <div class="zone-label">Discard</div>
+                        <div class="discard-stack">${discard_top}<div class="discard-count">${player.discard.length}</div></div>
+                    </div>
+                    <div class="persistent-zone">
+                        <div class="zone-label">Defense</div>
+                        <div class="defense-row">${defenses}</div>
+                    </div>
+                    <div class="persistent-zone">
+                        <div class="zone-label">Summons</div>
+                        <div class="summon-row">${summons}</div>
+                    </div>
+                </div>
+
+                <div class="status-row">${status_chips}</div>
             </article>
         `;
     }
 
-    render_hand_card(card, action_available) {
-        const definition = get_card_definition(card.definition_id);
-        const type_class = definition.type.toLowerCase().replaceAll(" ", "-");
-        const disabled = action_available ? "" : "disabled";
-
-        return `
-            <button
-                type="button"
-                class="card-button card-${this.escape_html(type_class)}"
-                data-action="select-card"
-                data-card-instance-id="${this.escape_html(card.instance_id)}"
-                ${disabled}>
-                <span class="card-type">${this.escape_html(definition.type)}</span>
-                <span class="card-name">${this.escape_html(definition.name)}</span>
-                <span class="card-symbols">${this.render_symbols(definition.symbols)}</span>
-                <span class="card-rules">${this.escape_html(definition.rules_text)}</span>
-                <span class="card-flavor">"${this.escape_html(definition.flavor_text)}"</span>
-            </button>
-        `;
+    render_hand(player, enabled) {
+        return player.hand.map((card, card_index) =>
+            this.card_renderer.render_hand_card(card, enabled, card_index, player.hand.length)
+        ).join("");
     }
 
-    render_symbols(symbols) {
-        const parts = [];
-        for (const symbol_name of ["attack", "defense", "healing", "draw", "play_again"]) {
-            for (let symbol_number = 0; symbol_number < symbols[symbol_name]; symbol_number += 1) {
-                parts.push(SYMBOL_GLYPHS[symbol_name]);
-            }
-        }
-        if (parts.length === 0) {
-            return `<span class="muted">TEXT</span>`;
-        }
-        return parts.join("");
-    }
-
-    render_defenses(player) {
-        if (player.defenses.length === 0) {
-            return `<span class="muted">None</span>`;
-        }
-
-        return player.defenses.map((defense) => `
-            <span class="defense-token">${this.escape_html(defense.name)} | ${defense.current_shields}/${defense.max_shields} 🛡️</span>
-        `).join("");
-    }
-
-    render_summons(player) {
-        if (player.summons.length === 0) {
-            return `<span class="muted">None</span>`;
-        }
-
-        return player.summons.map((summon) => `
-            <span class="summon-token">${this.escape_html(summon.name)} | ${summon.hp}/${summon.max_hp} HP</span>
-        `).join("");
-    }
-
-    render_status_chips(player) {
-        const statuses = [];
-
-        if (player.forced_attack_target_player_id !== null) {
-            statuses.push("Taunted");
-        }
-        if (player.outgoing_attack_reductions.length > 0) {
-            statuses.push(`Attack reduction x${player.outgoing_attack_reductions.length}`);
-        }
-        if (player.incoming_attack_reductions.length > 0) {
-            statuses.push(`Incoming reduction x${player.incoming_attack_reductions.length}`);
-        }
-        if (player.skip_next_turn_after_draw) {
-            statuses.push("Next turn skipped after draw");
-        }
-        if (player.skip_next_play_again_count > 0) {
-            statuses.push(`Skip Play Again x${player.skip_next_play_again_count}`);
-        }
-        if (player.phosphor_burn_source_player_ids.length > 0) {
-            statuses.push("Phosphor Burn");
-        }
-        if (player.tank_specs_activated_turn !== null) {
-            statuses.push("Tank Specs");
-        }
-        if (player.blessing_of_kings_activated_turn !== null) {
-            statuses.push("Blessing of Kings");
-        }
-        if (player.vengeance_activated_turn !== null) {
-            statuses.push("Vengeance");
-        }
-
-        if (statuses.length === 0) {
-            return "";
-        }
-
-        return `<div class="zone-label">Statuses</div><div>${statuses.map((status) => `<span class="status-chip">${this.escape_html(status)}</span>`).join("")}</div>`;
-    }
-
-    render_active_ability_buttons(game_state, player) {
-        if (game_state.get_current_decision() !== null) {
+    render_active_ability_button(player) {
+        if (player.player_type !== PLAYER_TYPES.HUMAN) {
             return "";
         }
 
         if (player.character_id === CHARACTER_IDS.GRANDPA) {
-            const disabled = player.monochrome_lecture_used_this_turn ? "disabled" : "";
-            return `<button type="button" data-action="select-ability" data-ability-id="${CHARACTER_ABILITY_IDS.MONOCHROME_LECTURE}" ${disabled}>Monochrome Lecture</button>`;
+            return `<button type="button" data-action="select-ability" data-ability-id="${CHARACTER_ABILITY_IDS.MONOCHROME_LECTURE}" ${player.monochrome_lecture_used_this_turn ? "disabled" : ""}>Monochrome Lecture</button>`;
         }
 
         if (player.character_id === CHARACTER_IDS.MALRIC) {
-            const disabled = player.threat_generation_used_this_turn || player.cards_played_this_turn > 0 ? "disabled" : "";
-            return `<button type="button" data-action="select-ability" data-ability-id="${CHARACTER_ABILITY_IDS.THREAT_GENERATION}" ${disabled}>Threat Generation</button>`;
+            const disabled = player.threat_generation_used_this_turn || player.cards_played_this_turn > 0;
+            return `<button type="button" data-action="select-ability" data-ability-id="${CHARACTER_ABILITY_IDS.THREAT_GENERATION}" ${disabled ? "disabled" : ""}>Threat Generation</button>`;
         }
 
         return "";
     }
 
+    render_status_chips(player) {
+        const statuses = [];
+        if (player.forced_attack_target_player_id !== null) statuses.push("TAUNTED");
+        if (player.outgoing_attack_reductions.length > 0) statuses.push("ATTACK DOWN");
+        if (player.incoming_attack_reductions.length > 0) statuses.push("GUARDED");
+        if (player.skip_next_turn_after_draw) statuses.push("LOADING");
+        if (player.skip_next_play_again_count > 0) statuses.push("PLAY AGAIN BLOCKED");
+        if (player.phosphor_burn_source_player_ids.length > 0) statuses.push("PHOSPHOR BURN");
+        if (player.tank_specs_activated_turn !== null) statuses.push("TANK SPECS");
+        if (player.blessing_of_kings_activated_turn !== null) statuses.push("BLESSED");
+        if (player.vengeance_activated_turn !== null) statuses.push("VENGEANCE");
+
+        return statuses.map((status) => `<span class="status-chip">${status}</span>`).join("");
+    }
+
     render_decision_overlay(game_state, decision, view_state) {
         const player = game_state.get_player_by_id(decision.player_id);
+
+        if (player.player_type === PLAYER_TYPES.COMPUTER) {
+            return `
+                <div class="modal-overlay">
+                    <div class="choice-modal">
+                        <div class="computer-thinking">${this.escape_html(player.name)} is deciding...</div>
+                    </div>
+                </div>
+            `;
+        }
 
         if (decision.type === DECISION_TYPES.DISCARD_CARDS) {
             if (!view_state.private_decision_revealed) {
                 return `
-                    <div class="overlay">
-                        <div class="modal">
-                            <div class="title-kicker">Private decision</div>
-                            <h2>Pass the device to ${this.escape_html(player.name)}</h2>
-                            <p>${this.escape_html(decision.source_name)} requires ${decision.count} discard(s).</p>
-                            <button type="button" class="primary-button" data-action="reveal-private-decision" data-decision-id="${this.escape_html(decision.id)}">Reveal My Hand</button>
+                    <div class="modal-overlay">
+                        <div class="choice-modal">
+                            <h2>Private Hand Choice</h2>
+                            <p>Pass the device to ${this.escape_html(player.name)}.</p>
+                            <button type="button" class="primary-action" data-action="reveal-private-decision" data-decision-id="${this.escape_html(decision.id)}">Reveal Hand</button>
                         </div>
                     </div>
                 `;
             }
 
-            const card_choices = player.hand.map((card) => {
+            const choices = player.hand.map((card) => {
                 const definition = get_card_definition(card.definition_id);
                 return `
                     <label class="discard-choice">
                         <input type="checkbox" data-discard-card="${this.escape_html(card.instance_id)}">
-                        <span><strong>${this.escape_html(definition.name)}</strong><br><span class="muted">${this.escape_html(definition.rules_text)}</span></span>
+                        <span><strong>${this.escape_html(definition.name)}</strong><small>${this.escape_html(definition.rules_text)}</small></span>
                     </label>
                 `;
             }).join("");
 
             return `
-                <div class="overlay">
-                    <div class="modal">
-                        <div class="title-kicker">${this.escape_html(player.name)}</div>
-                        <h2>Choose ${decision.count} card(s) to discard</h2>
-                        ${view_state.decision_error === null ? "" : `<div class="error-banner">${this.escape_html(view_state.decision_error)}</div>`}
-                        ${card_choices}
-                        <div class="modal-actions">
-                            <button type="button" class="primary-button" data-action="resolve-discard" data-decision-id="${this.escape_html(decision.id)}" data-player-id="${this.escape_html(player.id)}" data-required-count="${decision.count}">Discard Selected</button>
-                        </div>
+                <div class="modal-overlay">
+                    <div class="choice-modal">
+                        <h2>Discard ${decision.count}</h2>
+                        ${view_state.decision_error === null ? "" : `<div class="form-error">${this.escape_html(view_state.decision_error)}</div>`}
+                        <div class="discard-list">${choices}</div>
+                        <button type="button" class="primary-action" data-action="resolve-discard" data-decision-id="${this.escape_html(decision.id)}" data-player-id="${this.escape_html(player.id)}" data-required-count="${decision.count}">Discard Selected</button>
                     </div>
                 </div>
             `;
@@ -417,79 +571,43 @@ export class UIHandler {
         if (decision.type === DECISION_TYPES.RECLAIM_DEFENSE) {
             const choices = decision.card_instance_ids.map((card_instance_id) => {
                 const card = player.discard.find((candidate) => candidate.instance_id === card_instance_id);
-                if (card === undefined) {
-                    throw new Error(`Eligible Defense card ${card_instance_id} is missing from discard.`);
-                }
-                const definition = get_card_definition(card.definition_id);
-                return `<button type="button" class="choice-button" data-action="resolve-reclaim" data-decision-id="${this.escape_html(decision.id)}" data-player-id="${this.escape_html(player.id)}" data-card-instance-id="${this.escape_html(card.instance_id)}"><strong>${this.escape_html(definition.name)}</strong><br>${this.escape_html(definition.rules_text)}</button>`;
+                if (card === undefined) throw new Error(`Missing Defense card ${card_instance_id}.`);
+                return `<button type="button" class="choice-button" data-action="resolve-reclaim" data-decision-id="${decision.id}" data-player-id="${player.id}" data-card-instance-id="${card.instance_id}">${this.escape_html(get_card_definition(card.definition_id).name)}</button>`;
             }).join("");
 
-            return `
-                <div class="overlay">
-                    <div class="modal">
-                        <h2>Cooldown Ready!</h2>
-                        <p>Choose a Defense card to return to ${this.escape_html(player.name)}'s hand.</p>
-                        <div class="choice-grid">${choices}</div>
-                    </div>
-                </div>
-            `;
+            return this.render_choice_modal("Cooldown Ready!", "Return a Defense card to your hand.", choices);
         }
 
         if (decision.type === DECISION_TYPES.LOVE_OR_HATE) {
-            const source = game_state.get_player_by_id(decision.source_player_id);
-            return `
-                <div class="overlay">
-                    <div class="modal">
-                        <div class="title-kicker">${this.escape_html(player.name)} chooses</div>
-                        <h2>Love Me or Hate Me</h2>
-                        <p>${this.escape_html(source.name)} played Love Me or Hate Me.</p>
-                        <div class="choice-grid">
-                            <button type="button" class="choice-button" data-action="resolve-love-hate" data-choice="love" data-decision-id="${this.escape_html(decision.id)}" data-player-id="${this.escape_html(player.id)}"><strong>Love</strong><br>Heal ${this.escape_html(source.name)} for 2 HP.</button>
-                            <button type="button" class="choice-button danger-button" data-action="resolve-love-hate" data-choice="hate" data-decision-id="${this.escape_html(decision.id)}" data-player-id="${this.escape_html(player.id)}"><strong>Hate</strong><br>Take 2 damage. ${this.escape_html(source.name)} draws later.</button>
-                        </div>
-                    </div>
-                </div>
-            `;
+            return this.render_choice_modal(
+                "Love Me or Hate Me",
+                `${this.escape_html(player.name)} chooses.`,
+                `
+                    <button type="button" class="choice-button" data-action="resolve-love-hate" data-choice="love" data-decision-id="${decision.id}" data-player-id="${player.id}">Love: heal Patchadin 2</button>
+                    <button type="button" class="choice-button danger-choice" data-action="resolve-love-hate" data-choice="hate" data-decision-id="${decision.id}" data-player-id="${player.id}">Hate: take 2 damage</button>
+                `
+            );
         }
 
         if (decision.type === DECISION_TYPES.SCREEN_BURN_TARGET) {
-            const choices = decision.target_player_ids.map((target_player_id) => {
-                const target_player = game_state.get_player_by_id(target_player_id);
-                return `<button type="button" class="choice-button" data-action="resolve-screen-burn" data-decision-id="${this.escape_html(decision.id)}" data-player-id="${this.escape_html(player.id)}" data-target-player-id="${this.escape_html(target_player.id)}">${this.escape_html(target_player.name)}<br>Deal 1 damage</button>`;
-            }).join("");
+            const choices = decision.target_player_ids.map((target_id) => {
+                const target = game_state.get_player_by_id(target_id);
+                return `<button type="button" class="choice-button" data-action="resolve-screen-burn" data-decision-id="${decision.id}" data-player-id="${player.id}" data-target-player-id="${target.id}">${this.escape_html(target.name)}</button>`;
+            }).join("") + `<button type="button" class="choice-button" data-action="skip-screen-burn" data-decision-id="${decision.id}" data-player-id="${player.id}">Skip</button>`;
 
-            return `
-                <div class="overlay">
-                    <div class="modal">
-                        <h2>Screen Burn-In</h2>
-                        <p>You may deal 1 additional damage to one opponent damaged by the spell.</p>
-                        <div class="choice-grid">${choices}</div>
-                        <div class="modal-actions" style="margin-top: 10px;">
-                            <button type="button" data-action="skip-screen-burn" data-decision-id="${this.escape_html(decision.id)}" data-player-id="${this.escape_html(player.id)}">Skip</button>
-                        </div>
-                    </div>
-                </div>
-            `;
+            return this.render_choice_modal("Screen Burn-In", "Deal 1 extra damage to a damaged opponent.", choices);
         }
 
         if (decision.type === DECISION_TYPES.RAID_PALADIN_ACTION) {
-            const attack_choices = decision.target_player_ids.map((target_player_id) => {
-                const target_player = game_state.get_player_by_id(target_player_id);
-                return `<button type="button" class="choice-button danger-button" data-action="resolve-raid" data-decision-id="${this.escape_html(decision.id)}" data-player-id="${this.escape_html(player.id)}" data-raid-action="attack" data-target-player-id="${this.escape_html(target_player.id)}">Attack ${this.escape_html(target_player.name)}<br>Deal 1 damage</button>`;
+            const attacks = decision.target_player_ids.map((target_id) => {
+                const target = game_state.get_player_by_id(target_id);
+                return `<button type="button" class="choice-button" data-action="resolve-raid" data-decision-id="${decision.id}" data-player-id="${player.id}" data-raid-action="attack" data-target-player-id="${target.id}">Attack ${this.escape_html(target.name)}</button>`;
             }).join("");
-
-            return `
-                <div class="overlay">
-                    <div class="modal">
-                        <h2>Raid Paladin</h2>
-                        <p>Choose this summon's start-of-turn action.</p>
-                        <div class="choice-grid">
-                            <button type="button" class="choice-button" data-action="resolve-raid" data-decision-id="${this.escape_html(decision.id)}" data-player-id="${this.escape_html(player.id)}" data-raid-action="heal"><strong>Heal</strong><br>Restore 1 HP.</button>
-                            ${attack_choices}
-                        </div>
-                    </div>
-                </div>
-            `;
+            return this.render_choice_modal(
+                "Raid Paladin",
+                "Choose this summon action.",
+                `<button type="button" class="choice-button" data-action="resolve-raid" data-decision-id="${decision.id}" data-player-id="${player.id}" data-raid-action="heal">Heal 1</button>${attacks}`
+            );
         }
 
         throw new Error(`No UI renderer for decision type: ${decision.type}`);
@@ -500,82 +618,111 @@ export class UIHandler {
             const player = game_state.get_player_by_id(interaction.player_id);
             const card = rules_engine.get_card_from_hand(player, interaction.card_instance_id);
             const definition = get_card_definition(card.definition_id);
-            const choices = interaction.options.map((conversion, option_index) => `
-                <button type="button" class="choice-button" data-action="choose-conversion" data-card-instance-id="${this.escape_html(card.instance_id)}" data-option-index="${option_index}">
-                    ${this.escape_html(conversion.from)} to ${this.escape_html(conversion.to)}
-                </button>
-            `).join("");
+            const choices = interaction.options.map((option, option_index) =>
+                `<button type="button" class="choice-button" data-action="choose-conversion" data-option-index="${option_index}">${SYMBOL_GLYPHS[option.from]} → ${SYMBOL_GLYPHS[option.to]}</button>`
+            ).join("");
 
-            return `
-                <div class="overlay">
-                    <div class="modal">
-                        <h2>Can Do Everything</h2>
-                        <p>${this.escape_html(definition.name)} may convert one Attack, Defense, or Healing symbol this turn.</p>
-                        <div class="choice-grid">
-                            <button type="button" class="choice-button" data-action="choose-no-conversion" data-card-instance-id="${this.escape_html(card.instance_id)}">Use card as printed</button>
-                            ${choices}
-                        </div>
-                        <div class="modal-actions" style="margin-top: 10px;"><button type="button" data-action="cancel-interaction">Cancel</button></div>
-                    </div>
-                </div>
-            `;
+            return this.render_choice_modal(
+                "Can Do Everything",
+                `Convert one symbol on ${this.escape_html(definition.name)}.`,
+                `<button type="button" class="choice-button" data-action="choose-no-conversion">Use printed symbols</button>${choices}<button type="button" class="choice-button" data-action="cancel-interaction">Cancel</button>`
+            );
         }
 
         if (interaction.type === "card_target") {
-            const player = game_state.get_player_by_id(interaction.player_id);
-            const card = rules_engine.get_card_from_hand(player, interaction.card_instance_id);
-            const definition = get_card_definition(card.definition_id);
-            const choices = interaction.targets.map((target, target_index) => `
-                <button type="button" class="choice-button" data-action="choose-card-target" data-target-index="${target_index}">${this.escape_html(target.label)}</button>
-            `).join("");
-
-            return `
-                <div class="overlay">
-                    <div class="modal">
-                        <h2>Target for ${this.escape_html(definition.name)}</h2>
-                        <div class="choice-grid">${choices}</div>
-                        <div class="modal-actions" style="margin-top: 10px;"><button type="button" data-action="cancel-interaction">Cancel</button></div>
-                    </div>
-                </div>
-            `;
+            const choices = interaction.targets.map((target, target_index) =>
+                `<button type="button" class="choice-button" data-action="choose-card-target" data-target-index="${target_index}">${this.escape_html(target.label)}</button>`
+            ).join("");
+            return this.render_choice_modal("Choose Target", "Select a legal table target.", `${choices}<button type="button" class="choice-button" data-action="cancel-interaction">Cancel</button>`);
         }
 
         if (interaction.type === "ability_target") {
-            const choices = interaction.target_player_ids.map((target_player_id) => {
-                const target_player = game_state.get_player_by_id(target_player_id);
-                return `<button type="button" class="choice-button" data-action="choose-ability-target" data-target-player-id="${this.escape_html(target_player.id)}">${this.escape_html(target_player.name)}</button>`;
+            const choices = interaction.target_player_ids.map((target_id) => {
+                const target = game_state.get_player_by_id(target_id);
+                return `<button type="button" class="choice-button" data-action="choose-ability-target" data-target-player-id="${target.id}">${this.escape_html(target.name)}</button>`;
             }).join("");
-
-            return `
-                <div class="overlay">
-                    <div class="modal">
-                        <h2>Choose an opponent</h2>
-                        <div class="choice-grid">${choices}</div>
-                        <div class="modal-actions" style="margin-top: 10px;"><button type="button" data-action="cancel-interaction">Cancel</button></div>
-                    </div>
-                </div>
-            `;
+            return this.render_choice_modal("Choose Opponent", "Select the ability target.", `${choices}<button type="button" class="choice-button" data-action="cancel-interaction">Cancel</button>`);
         }
 
         throw new Error(`No UI renderer for interaction type: ${interaction.type}`);
     }
 
+    render_choice_modal(title, copy, choices) {
+        return `
+            <div class="modal-overlay">
+                <div class="choice-modal">
+                    <h2>${title}</h2>
+                    <p>${copy}</p>
+                    <div class="choice-grid">${choices}</div>
+                </div>
+            </div>
+        `;
+    }
+
     render_fatal_error(error) {
-        const message = error instanceof Error ? `${error.name}: ${error.message}\n\n${error.stack}` : String(error);
+        const message = error instanceof Error
+            ? `${error.name}: ${error.message}\n\n${error.stack}`
+            : String(error);
+
         this.app_element.innerHTML = `
-            <main class="fatal-screen panel">
-                <div class="title-kicker">Fatal game error</div>
-                <h1>Execution stopped</h1>
-                <p>The game failed at the point of the error. No fallback state was substituted.</p>
-                <pre class="fatal-message">${this.escape_html(message)}</pre>
-                <button type="button" data-action="reload-page">Reload</button>
+            <main class="fatal-screen">
+                <section class="fatal-panel">
+                    <div class="screen-kicker">Fatal Game Error</div>
+                    <h1>Execution Stopped</h1>
+                    <p>The game stopped at the failing state. No replacement state was invented.</p>
+                    <pre>${this.escape_html(message)}</pre>
+                    <button type="button" class="primary-action" data-action="reload-page">Reload</button>
+                </section>
             </main>
         `;
     }
 
+    render_game_over(game_state) {
+        if (game_state.winner_player_id === null) {
+            throw new Error("Game Over requires a winner.");
+        }
+
+        const winner = game_state.get_player_by_id(game_state.winner_player_id);
+        const character = get_character_definition(winner.character_id);
+
+        this.app_element.innerHTML = `
+            <main class="victory-screen">
+                <section class="victory-card">
+                    ${this.card_renderer.render_character_portrait(winner.character_id, "portrait-large")}
+                    <div class="screen-kicker">Last Pixel Standing</div>
+                    <h1>${this.escape_html(winner.name)}</h1>
+                    <p>${this.escape_html(character.name)} wins with ${winner.hp} HP.</p>
+                    <button type="button" class="primary-action" data-action="new-match">Return to Main Menu</button>
+                </section>
+            </main>
+        `;
+    }
+
+    render_character_selector_cards(selected_character_id) {
+        return get_character_list().map((character) => `
+            <button type="button" class="character-choice ${character.id === selected_character_id ? "selected" : ""}" data-action="select-single-character" data-character-id="${character.id}">
+                ${this.card_renderer.render_character_portrait(character.id, "portrait-medium")}
+                <strong>${this.escape_html(character.name)}</strong>
+                <span>${this.escape_html(character.archetype)}</span>
+            </button>
+        `).join("");
+    }
+
+    render_player_count_options(selected_count) {
+        const options = [];
+        for (let player_count = MIN_PLAYERS; player_count <= MAX_PLAYERS; player_count += 1) {
+            options.push(`<option value="${player_count}" ${player_count === selected_count ? "selected" : ""}>${player_count}</option>`);
+        }
+        return options.join("");
+    }
+
+    render_setup_error(error_message) {
+        if (error_message === null) return "";
+        return `<div class="form-error">${this.escape_html(error_message)}</div>`;
+    }
+
     escape_html(value) {
-        const text = String(value);
-        return text
+        return String(value)
             .replaceAll("&", "&amp;")
             .replaceAll("<", "&lt;")
             .replaceAll(">", "&gt;")

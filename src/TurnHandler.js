@@ -1,12 +1,13 @@
 /* =====================================================================
    TurnHandler
-   Owns: match start, handoff, draw phase, mandatory actions, turn rotation.
+   Owns: initiative, draw phase, mandatory actions and turn rotation.
    Stays out of: card effect details and DOM rendering.
    ===================================================================== */
 
 import {
     BASE_ACTIONS_PER_TURN,
     CARDS_DRAWN_PER_TURN,
+    INITIATIVE_DIE_SIDES,
     OPENING_HAND_SIZE,
     PHASES,
 } from "./Constants.js";
@@ -25,8 +26,8 @@ export class TurnHandler {
         this.deck_handler = game_state.deck_handler;
     }
 
-    start_match(player_configurations) {
-        this.game_state.create_match(player_configurations);
+    start_match(player_configurations, game_mode) {
+        this.game_state.create_match(player_configurations, game_mode);
 
         for (const player of this.game_state.players) {
             this.deck_handler.draw_cards(player, OPENING_HAND_SIZE);
@@ -35,9 +36,78 @@ export class TurnHandler {
         this.game_state.add_event(`Each player drew an opening hand of ${OPENING_HAND_SIZE} cards.`, "system");
     }
 
+    roll_initiative(player_id) {
+        if (this.game_state.phase !== PHASES.INITIATIVE) {
+            throw new Error("Initiative can only be rolled during the initiative phase.");
+        }
+
+        const expected_player = this.game_state.get_next_initiative_player();
+        if (expected_player === null) {
+            throw new Error("No initiative participant is waiting to roll.");
+        }
+        if (expected_player.id !== player_id) {
+            throw new Error(`${player_id} cannot roll initiative for ${expected_player.name}.`);
+        }
+
+        const roll = this.rules_engine.dice_handler.roll_die(INITIATIVE_DIE_SIDES);
+        expected_player.initiative_roll = roll;
+        expected_player.initiative_history.push(roll);
+        this.game_state.add_event(`${expected_player.name} rolled ${roll} for initiative.`, "dice");
+        this.game_state.initiative_candidate_index += 1;
+
+        if (this.game_state.initiative_candidate_index < this.game_state.initiative_candidate_player_ids.length) {
+            return {
+                complete: false,
+                tied: false,
+                roll,
+            };
+        }
+
+        const candidates = this.game_state.initiative_candidate_player_ids.map((candidate_id) =>
+            this.game_state.get_player_by_id(candidate_id)
+        );
+        const highest_roll = Math.max(...candidates.map((candidate) => candidate.initiative_roll));
+        const tied_players = candidates.filter((candidate) => candidate.initiative_roll === highest_roll);
+
+        if (tied_players.length > 1) {
+            this.game_state.initiative_round += 1;
+            this.game_state.initiative_candidate_player_ids = tied_players.map((player) => player.id);
+            this.game_state.initiative_candidate_index = 0;
+            for (const player of tied_players) {
+                player.initiative_roll = null;
+            }
+            this.game_state.add_event(
+                `Initiative tie at ${highest_roll}. ${tied_players.map((player) => player.name).join(", ")} reroll.`,
+                "dice"
+            );
+            return {
+                complete: false,
+                tied: true,
+                roll,
+            };
+        }
+
+        const winner = tied_players[0];
+        this.game_state.initiative_winner_player_id = winner.id;
+        this.game_state.rotate_players_to_first(winner.id);
+        this.game_state.active_player_index = 0;
+        this.game_state.turn_number = 1;
+        this.game_state.round_number = 1;
+        this.game_state.actions_remaining = 0;
+        this.game_state.phase = PHASES.HANDOFF;
+        this.game_state.add_event(`${winner.name} won initiative and takes the first turn.`, "system");
+
+        return {
+            complete: true,
+            tied: false,
+            roll,
+            winner_player_id: winner.id,
+        };
+    }
+
     reveal_active_turn(player_id) {
         if (this.game_state.phase !== PHASES.HANDOFF) {
-            throw new Error("A turn can only be revealed from the handoff screen.");
+            throw new Error("A turn can only be revealed from the handoff state.");
         }
 
         const player = this.game_state.get_active_player();
@@ -66,7 +136,10 @@ export class TurnHandler {
             player.skip_next_turn_after_draw = false;
             this.game_state.actions_remaining = 0;
             this.game_state.active_turn_must_end_after_decisions = true;
-            this.game_state.add_event(`${player.name}'s turn ends after drawing because of Loading... Please Wait.`, "status");
+            this.game_state.add_event(
+                `${player.name}'s turn ends after drawing because of Loading... Please Wait.`,
+                "status"
+            );
             this.end_skipped_turn_if_ready();
         }
     }
@@ -161,6 +234,6 @@ export class TurnHandler {
         this.game_state.turn_number += 1;
         this.game_state.actions_remaining = 0;
         this.game_state.phase = PHASES.HANDOFF;
-        this.game_state.add_event(`Pass the device to ${this.game_state.get_active_player().name}.`, "system");
+        this.game_state.add_event(`Turn passes to ${this.game_state.get_active_player().name}.`, "system");
     }
 }

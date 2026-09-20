@@ -16,6 +16,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Syntax check modules
+        run: |
+          for source_file in src/*.js; do
+            node --check "$source_file"
+          done
+
       - name: Test
         run: npm test
 
@@ -24,3 +30,12 @@ jobs:
           test -f index.html
           test -f Styles.css
           test -f src/GameBootstrap.js
+          test -f GDD.md
+          test -f card_prompts.md
+
+      - name: Check project writing rules
+        run: |
+          if grep -nE '—|&mdash;' GDD.md card_prompts.md README.md Styles.css index.html src/*.js tests/*.mjs; then
+            echo "Forbidden em dash found."
+            exit 1
+          fi

@@ -7,9 +7,11 @@
 import {
     BASE_ACTIONS_PER_TURN,
     EVENT_LOG_LIMIT,
+    GAME_MODES,
     MAX_PLAYERS,
     MIN_PLAYERS,
     PHASES,
+    PLAYER_TYPES,
     STARTING_HP,
 } from "./Constants.js";
 import { get_character_definition } from "./CharacterData.js";
@@ -26,6 +28,7 @@ export class GameState {
 
     reset_to_setup() {
         this.players = [];
+        this.game_mode = null;
         this.active_player_index = 0;
         this.turn_number = 0;
         this.round_number = 0;
@@ -39,9 +42,13 @@ export class GameState {
         this.next_decision_number = 1;
         this.next_group_number = 1;
         this.love_hate_hate_counts = new Map();
+        this.initiative_candidate_player_ids = [];
+        this.initiative_candidate_index = 0;
+        this.initiative_round = 1;
+        this.initiative_winner_player_id = null;
     }
 
-    create_match(player_configurations) {
+    create_match(player_configurations, game_mode) {
         if (!Array.isArray(player_configurations)) {
             throw new TypeError("Player configurations must be an array.");
         }
@@ -50,7 +57,12 @@ export class GameState {
             throw new RangeError(`Player count must be between ${MIN_PLAYERS} and ${MAX_PLAYERS}.`);
         }
 
+        if (!Object.values(GAME_MODES).includes(game_mode)) {
+            throw new Error(`Unknown game mode: ${game_mode}`);
+        }
+
         this.reset_to_setup();
+        this.game_mode = game_mode;
 
         for (let player_index = 0; player_index < player_configurations.length; player_index += 1) {
             const configuration = player_configurations[player_index];
@@ -59,25 +71,34 @@ export class GameState {
             }
 
             const character = get_character_definition(configuration.character_id);
-            const player = this.create_player(player_index + 1, configuration.name.trim(), character.id);
+            if (!Object.values(PLAYER_TYPES).includes(configuration.player_type)) {
+                throw new Error(`Player ${player_index + 1} has an invalid player type.`);
+            }
+
+            const player = this.create_player(
+                player_index + 1,
+                configuration.name.trim(),
+                character.id,
+                configuration.player_type
+            );
             this.players.push(player);
         }
 
-        this.phase = PHASES.HANDOFF;
-        this.turn_number = 1;
-        this.round_number = 1;
-        this.active_player_index = 0;
-        this.actions_remaining = BASE_ACTIONS_PER_TURN;
-        this.add_event(`${this.get_active_player().name} will take the first turn.`, "system");
+        this.phase = PHASES.INITIATIVE;
+        this.initiative_candidate_player_ids = this.players.map((player) => player.id);
+        this.initiative_candidate_index = 0;
+        this.initiative_round = 1;
+        this.add_event("Initiative begins. Every participant rolls a d20.", "system");
     }
 
-    create_player(player_number, player_name, character_id) {
+    create_player(player_number, player_name, character_id, player_type) {
         const deck = this.deck_handler.build_character_deck(character_id);
 
         return {
             id: `player_${player_number}`,
             name: player_name,
             character_id,
+            player_type,
             hp: STARTING_HP,
             max_hp: STARTING_HP,
             deck,
@@ -86,6 +107,9 @@ export class GameState {
             defenses: [],
             summons: [],
             eliminated: false,
+            initiative_roll: null,
+            initiative_history: [],
+            last_played_card_definition_id: null,
             outgoing_attack_reductions: [],
             incoming_attack_reductions: [],
             forced_attack_target_player_id: null,
@@ -129,6 +153,35 @@ export class GameState {
 
     get_living_opponents(player_id) {
         return this.players.filter((player) => player.id !== player_id && !player.eliminated);
+    }
+
+    get_next_initiative_player() {
+        if (this.phase !== PHASES.INITIATIVE) {
+            throw new Error("Initiative player requested outside the initiative phase.");
+        }
+
+        if (this.initiative_candidate_index >= this.initiative_candidate_player_ids.length) {
+            return null;
+        }
+
+        const player_id = this.initiative_candidate_player_ids[this.initiative_candidate_index];
+        return this.get_player_by_id(player_id);
+    }
+
+    rotate_players_to_first(first_player_id) {
+        const first_player_index = this.players.findIndex((player) => player.id === first_player_id);
+        if (first_player_index === -1) {
+            throw new Error(`Cannot rotate turn order to unknown player ${first_player_id}.`);
+        }
+
+        if (first_player_index === 0) {
+            return;
+        }
+
+        const leading_players = this.players.slice(0, first_player_index);
+        const trailing_players = this.players.slice(first_player_index);
+        this.players = trailing_players.concat(leading_players);
+        this.active_player_index = 0;
     }
 
     add_event(message, tone) {

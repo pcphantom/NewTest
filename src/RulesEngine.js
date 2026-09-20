@@ -232,6 +232,7 @@ export class RulesEngine {
         player.hand.splice(card_index, 1);
         this.game_state.actions_remaining -= 1;
         player.cards_played_this_turn += 1;
+        player.last_played_card_definition_id = definition.id;
 
         if (symbol_conversion !== null) {
             player.can_do_everything_used_this_turn = true;

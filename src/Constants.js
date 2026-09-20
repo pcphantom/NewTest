@@ -17,6 +17,19 @@ export const MIN_DAMAGE_AFTER_REDUCTION = 1;
 export const RAID_PALADIN_COUNT = 3;
 export const RAID_PALADIN_HP = 2;
 export const EVENT_LOG_LIMIT = 80;
+export const INITIATIVE_DIE_SIDES = 20;
+export const AI_ACTION_DELAY_MS = 650;
+export const AI_INITIATIVE_DELAY_MS = 700;
+
+export const GAME_MODES = Object.freeze({
+    SINGLE_PLAYER: "single_player",
+    LOCAL_MULTIPLAYER: "local_multiplayer",
+});
+
+export const PLAYER_TYPES = Object.freeze({
+    HUMAN: "human",
+    COMPUTER: "computer",
+});
 
 export const CARD_TYPES = Object.freeze({
     ATTACK: "Attack",
@@ -57,9 +70,17 @@ export const TARGET_TYPES = Object.freeze({
 
 export const PHASES = Object.freeze({
     SETUP: "setup",
+    INITIATIVE: "initiative",
     HANDOFF: "handoff",
     PLAY: "play",
     GAME_OVER: "game_over",
+});
+
+export const MENU_SCREENS = Object.freeze({
+    MAIN: "main",
+    SINGLE_PLAYER_SETUP: "single_player_setup",
+    LOCAL_MULTIPLAYER_SETUP: "local_multiplayer_setup",
+    HOW_TO_PLAY: "how_to_play",
 });
 
 export const DECISION_TYPES = Object.freeze({
