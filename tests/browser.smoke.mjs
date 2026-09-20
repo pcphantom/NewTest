@@ -77,18 +77,28 @@ try {
         assert.equal(await action(page, "toggle-hand").getAttribute("aria-expanded"), "true");
         await boardFits(page);
         const cards = page.locator(".hand-card");
+        const fanStyles = await cards.evaluateAll(nodes => nodes.map(node => {
+            const style = getComputedStyle(node);
+            return { opacity: style.opacity, overlap: style.marginLeft, background: style.backgroundColor };
+        }));
+        assert.ok(fanStyles.every(card => card.opacity === '1'), 'overlapping cards stay opaque');
+        assert.ok(fanStyles.slice(1).every(card => card.overlap === (width <= 680 ? '-32px' : '-22px')), 'original fan overlap is retained');
         if (!touch) {
             await cards.first().hover();
+            await page.waitForTimeout(150);
             const card = await cards.first().boundingBox();
             const fan = await page.locator('.hand-fan').boundingBox();
             assert.equal(await page.locator('#card-hover-preview').isVisible(), false, 'hand hover does not spawn a floating copy');
             assert.ok(card.width > 216 && card.width < 240, 'the original card scales proportionally');
             assert.ok(card.y >= fan.y && card.y >= 0, 'lifted card is not clipped at the top');
+            assert.equal(await cards.first().evaluate(node => getComputedStyle(node).zIndex), '1000', 'hovered card is in front');
             await page.screenshot({path:join(output, `hover-${width}.png`)});
         }
         const before = await page.evaluate(() => JSON.stringify(testGame.game_state));
-        await activate(cards.first());
+        if (touch) await cards.first().press('i');
+        else await cards.first().click({button:'right'});
         assert.equal(await page.locator(".card-inspection").count(), 1);
+        assert.equal(await page.locator('.card-inspection [data-action="select-card"]').count(), 0, 'inspection is not a second Play confirmation');
         assert.equal(await page.evaluate(() => JSON.stringify(testGame.game_state)), before, "inspection does not play card");
         await page.screenshot({path:join(output, `inspect-${width}.png`)});
         await activate(action(page, "close-inspection"));
@@ -110,7 +120,7 @@ try {
         await action(page, "close-inspection").click();
         await page.mouse.move(2,2);
         await page.screenshot({path:join(output, `board-${width}.png`)});
-        // Exercise a real attack through inspect -> Play -> target -> visible HP update.
+        // Exercise a real attack through click/tap -> target -> visible HP update.
         await page.evaluate(() => {
             const {game_state, input_handler} = testGame;
             const player = game_state.get_active_player();
@@ -120,7 +130,7 @@ try {
             input_handler.render();
         });
         await activate(page.locator('.hand-card[data-card-definition-id="grandpa_8_bit_blast"]').first());
-        await activate(action(page, "select-card"));
+        assert.equal(await page.locator('.card-inspection').count(), 0, 'playing bypasses inspection');
         assert.match(await page.locator('.choice-modal').innerText(), /Deal 2 damage/);
         // Menu also works during a pending choice, without losing that choice.
         await activate(page.locator('.modal-game-menu'));
@@ -145,7 +155,7 @@ try {
             assert.match(await page.locator('#card-hover-preview').innerText(), /Defensive Stance/);
         }
         await activate(publicCard);
-        assert.equal(await action(page, "select-card").count(), 0, "opponent card is reference-only");
+        assert.equal(await page.locator('.card-inspection [data-action="select-card"]').count(), 0, "opponent card is reference-only");
         await activate(action(page, "close-inspection"));
         console.log(`PASS ${width}x${height}: setup, HP, hand, card reading, pause/resume, skills`);
         await context.close();
@@ -173,7 +183,7 @@ try {
         testGame.input_handler.render();
     });
     const lastCard = page.locator('.hand-card').last();
-    await lastCard.click();
+    await lastCard.click({button:'right'});
     await action(page, "close-inspection").click();
     assert.ok(await page.locator('.hand-fan').evaluate(node => node.scrollLeft > 0), "reading a card preserves hand scroll position");
     await page.keyboard.press('Escape');
@@ -219,7 +229,7 @@ try {
     const v2Preview = await v2Card.boundingBox();
     assert.ok(v2Preview.y >= 0 && v2Preview.y + v2Preview.height <= 901);
     await page.screenshot({path:join(output,'v2-blatant-hover.png')});
-    await page.locator('.hand-card[data-card-definition-id="patchadin_blatant_favoritism"]').first().click();
+    await page.locator('.hand-card[data-card-definition-id="patchadin_blatant_favoritism"]').first().click({button:'right'});
     await page.setViewportSize({width:390,height:844});
     await page.screenshot({path:join(output,'v2-blatant-mobile.png')});
     await action(page,'close-inspection').click();

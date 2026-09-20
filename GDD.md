@@ -208,8 +208,8 @@ Card artwork contains no gameplay data. Names, symbols, text and numbers are ren
 
 ### Interaction
 
-- Hover shows a large, viewport-bounded preview outside the hand's clipping container.
-- Click/tap opens a readable card reference, including skill rules and flavor text. An explicit Play button commits the selection.
+- The hand uses overlapping, opaque cards with the original fan angles. Hover lifts and uniformly enlarges the actual card, bringing it above its neighbors; padding keeps it inside the visible hand area. Public table cards use a viewport-bounded reading preview.
+- Click/tap plays an available hand card directly, without a confirmation. Right-click, touch and hold, or focus a hand card and press I to inspect its full rules and flavor text without playing. Unavailable hand cards and public cards open their reference on click/tap.
 - Own hand cards and all face-up public cards can be inspected. Opponent hands remain private.
 - Targeted cards show named legal choices and the card's complete effect text.
 - Only Judgment offers Can Do Everything symbol conversion before target selection.

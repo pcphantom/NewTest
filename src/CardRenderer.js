@@ -22,17 +22,18 @@ export class CardRenderer {
         const theme_class = this.get_theme_class(definition.character_id);
         const type_class = this.get_type_class(definition.type);
         const spread_offset = card_index - ((card_count - 1) / 2);
-        const rotation = Math.max(-3, Math.min(3, spread_offset));
+        const rotation = Math.max(-8, Math.min(8, spread_offset * 2.1));
 
         return `
             <button
                 type="button"
                 class="game-card hand-card ${theme_class} ${type_class}"
                 style="--hand-rotation: ${rotation}deg; --hand-index: ${card_index};"
-                data-action="inspect-card"
+                data-action="${enabled ? 'select-card' : 'inspect-card'}"
                 data-card-definition-id="${this.escape_html(definition.id)}"
                 data-card-instance-id="${this.escape_html(card.instance_id)}"
-                aria-label="Read ${this.escape_html(definition.name)}${enabled ? ', then choose Play' : ''}">
+                title="${enabled ? 'Click or tap to play. ' : ''}Right-click, hold, or press I to read."
+                aria-label="${enabled ? 'Play' : 'Read'} ${this.escape_html(definition.name)}">
                 ${this.render_card_face(definition)}
             </button>
         `;

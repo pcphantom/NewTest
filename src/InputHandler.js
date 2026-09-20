@@ -47,6 +47,8 @@ export class InputHandler {
         this.hand_hovered = false;
         this.hand_hover_suppressed = false;
         this.focus_return_selector = null;
+        this.hand_press = null;
+        this.suppress_hand_click = false;
     }
 
     initialize() {
@@ -55,6 +57,11 @@ export class InputHandler {
         this.app_element.addEventListener('pointerover', event => this.handle_pointer_over(event));
         this.app_element.addEventListener('pointerout', event => this.handle_pointer_out(event));
         this.app_element.addEventListener('keydown', event => this.handle_keydown(event));
+        this.app_element.addEventListener('contextmenu', event => this.handle_card_context_menu(event));
+        this.app_element.addEventListener('pointerdown', event => this.begin_hand_press(event));
+        this.app_element.addEventListener('pointermove', event => this.move_hand_press(event));
+        this.app_element.addEventListener('pointerup', () => this.cancel_hand_press());
+        this.app_element.addEventListener('pointercancel', () => this.cancel_hand_press());
         this.window.document.addEventListener('fullscreenchange', () => this.update_fullscreen_buttons());
         this.render();
     }
@@ -75,6 +82,11 @@ export class InputHandler {
         if (!(event.target instanceof Element)) return;
         const button = event.target.closest("button[data-action]");
         if (button === null) return;
+        if (this.suppress_hand_click && button.classList.contains('hand-card')) {
+            this.suppress_hand_click = false;
+            event.preventDefault();
+            return;
+        }
 
         const action = button.dataset.action;
         if (typeof action !== "string") {
@@ -88,10 +100,7 @@ export class InputHandler {
                 this.update_hand_drawer();
                 return;
             case 'inspect-card':
-                this.clear_automatic_timer();
-                this.focus_return_selector = button.hasAttribute('data-card-instance-id') ? `[data-action="inspect-card"][data-card-instance-id="${button.dataset.cardInstanceId}"]` : `[data-action="inspect-card"][data-card-definition-id="${button.dataset.cardDefinitionId}"]`;
-                this.view_state.inspected_card = {definition_id: this.require_dataset_string(button, 'cardDefinitionId'), instance_id: button.hasAttribute('data-card-instance-id') ? button.dataset.cardInstanceId : null};
-                this.render();
+                this.inspect_card(button);
                 return;
             case 'show-skills':
                 this.clear_automatic_timer();
@@ -361,6 +370,55 @@ export class InputHandler {
         this.after_mutation();
     }
 
+    inspect_card(button) {
+        this.cancel_hand_press();
+        this.clear_automatic_timer();
+        this.focus_return_selector = button.hasAttribute('data-card-instance-id')
+            ? `.hand-card[data-card-instance-id="${button.dataset.cardInstanceId}"]`
+            : `[data-action="inspect-card"][data-card-definition-id="${button.dataset.cardDefinitionId}"]`;
+        this.view_state.inspected_card = {
+            definition_id: this.require_dataset_string(button, 'cardDefinitionId'),
+            instance_id: button.hasAttribute('data-card-instance-id') ? button.dataset.cardInstanceId : null,
+        };
+        this.render();
+    }
+
+    handle_card_context_menu(event) {
+        if (!(event.target instanceof Element)) return;
+        const card = event.target.closest('.hand-card');
+        if (card === null || this.app_element.querySelector('.modal-overlay') !== null) return;
+        event.preventDefault();
+        this.suppress_hand_click = true;
+        this.inspect_card(card);
+    }
+
+    begin_hand_press(event) {
+        this.cancel_hand_press();
+        this.suppress_hand_click = false;
+        if (event.pointerType !== 'touch' || !(event.target instanceof Element)) return;
+        const card = event.target.closest('.hand-card');
+        if (card === null || this.app_element.querySelector('.modal-overlay') !== null) return;
+        this.hand_press = {
+            x: event.clientX, y: event.clientY,
+            timer: this.window.setTimeout(() => {
+                this.suppress_hand_click = true;
+                this.inspect_card(card);
+            }, 550),
+        };
+    }
+
+    move_hand_press(event) {
+        if (this.hand_press !== null && Math.hypot(event.clientX - this.hand_press.x, event.clientY - this.hand_press.y) > 10) {
+            this.cancel_hand_press();
+        }
+    }
+
+    cancel_hand_press() {
+        if (this.hand_press === null) return;
+        this.window.clearTimeout(this.hand_press.timer);
+        this.hand_press = null;
+    }
+
     select_card(button) {
         this.view_state.inspected_card = null;
         const player = this.game_state.get_active_player();
@@ -590,6 +648,7 @@ export class InputHandler {
     }
 
     return_to_main_menu() {
+        this.cancel_hand_press();
         this.clear_automatic_timer();
         this.game_state.reset_to_setup();
         this.view_state.menu_screen = MENU_SCREENS.MAIN;
@@ -718,6 +777,14 @@ export class InputHandler {
     }
 
     handle_keydown(event) {
+        if (event.key.toLowerCase() === 'i' && event.target instanceof Element) {
+            const card = event.target.closest('.hand-card');
+            if (card !== null && this.app_element.querySelector('.modal-overlay') === null) {
+                event.preventDefault();
+                this.inspect_card(card);
+                return;
+            }
+        }
         if (event.key === 'Escape') {
             if (this.view_state.pause_menu) {
                 this.view_state.pause_menu = false;

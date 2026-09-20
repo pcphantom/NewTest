@@ -11,6 +11,21 @@ test("v2 card display uses one numbered icon per nonzero effect", () => {
     assert.match(html, /class="symbol-value"[^>]*>3</);
 });
 
+test("hand cards keep the original fan and play directly only when playable", () => {
+    const renderer = new CardRenderer();
+    const card = { instance_id: "screen-saver", definition_id: "grandpa_screen_saver" };
+    const playable = renderer.render_hand_card(card, true, 0, 4);
+    assert.match(playable, /data-action="select-card"/);
+    assert.match(playable, /aria-label="Play Screen Saver"/);
+    assert.match(playable, /--hand-rotation: -3.1500000000000004deg/);
+    assert.match(renderer.render_hand_card(card, true, 0, 20), /--hand-rotation: -8deg/);
+    assert.match(renderer.render_hand_card(card, true, 19, 20), /--hand-rotation: 8deg/);
+    const unavailable = renderer.render_hand_card(card, false, 0, 4);
+    assert.match(unavailable, /data-action="inspect-card"/);
+    assert.match(unavailable, /aria-label="Read Screen Saver"/);
+    assert.doesNotMatch(unavailable, /\bdisabled\b/, "unavailable cards remain readable, without disabled-button transparency");
+});
+
 test("all cards retain flavor text and skill cards visibly explain their skills", () => {
     const renderer = new CardRenderer();
     for (const card of get_all_card_definitions()) {

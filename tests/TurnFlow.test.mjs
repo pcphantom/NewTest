@@ -59,6 +59,94 @@ function ui_harness() {
     return { app, ui, view };
 }
 
+function hand_button(g, definition_id) {
+    let card = g.human.hand.find(card => card.definition_id === definition_id);
+    if (!card) {
+        const index = g.human.deck.findIndex(card => card.definition_id === definition_id);
+        assert.ok(index >= 0);
+        [card] = g.human.deck.splice(index, 1);
+        g.human.hand.push(card);
+    }
+    return {
+        dataset: { action: 'select-card', cardInstanceId: card.instance_id, cardDefinitionId: card.definition_id },
+        hasAttribute: name => name === 'data-card-instance-id',
+        classList: { contains: name => name === 'hand-card' },
+        closest() { return this; },
+    };
+}
+
+test("Screen Saver plays immediately, without an inspection, confirmation or target prompt", () => {
+    const g = game();
+    const { input } = input_harness(g);
+    const button = hand_button(g, 'grandpa_screen_saver');
+    const actions_before = g.state.actions_remaining;
+    input.select_card(button);
+    assert.equal(input.view_state.inspected_card, null);
+    assert.equal(input.view_state.interaction, null);
+    assert.equal(g.state.get_current_decision(), null);
+    assert.equal(g.human.defenses[0].current_shields, 4);
+    assert.equal(g.state.actions_remaining, actions_before - 1);
+    assert.ok(!g.human.hand.some(card => card.instance_id === button.dataset.cardInstanceId));
+});
+
+test("clicking an attack goes straight to its required target, not an extra Play confirmation", () => {
+    const g = game();
+    const { input } = input_harness(g);
+    input.select_card(hand_button(g, 'grandpa_8_bit_blast'));
+    assert.equal(input.view_state.inspected_card, null);
+    assert.equal(input.view_state.interaction.type, 'card_target');
+    assert.equal(g.human.cards_played_this_turn, 0);
+    input.choose_card_target({ dataset: { targetIndex: '0' } });
+    assert.equal(g.cpu.hp, 10);
+    assert.equal(g.human.cards_played_this_turn, 1);
+});
+
+test("optional inspection is read-only and contains no Play confirmation", () => {
+    const g = game();
+    const { input } = input_harness(g);
+    const button = hand_button(g, 'grandpa_screen_saver');
+    const before = JSON.stringify(g.state);
+    input.inspect_card(button);
+    assert.equal(JSON.stringify(g.state), before);
+    assert.equal(input.view_state.inspected_card.definition_id, 'grandpa_screen_saver');
+    const { ui } = ui_harness();
+    const html = ui.render_card_inspection(g.state, input.view_state.inspected_card);
+    assert.match(html, /Screen Saver/);
+    assert.match(html, /data-action="close-inspection"/);
+    assert.doesNotMatch(html, /data-action="select-card"|Choose Play|choose a target/);
+});
+
+test("touch hold reads without playing, while a tap plays and a swipe cancels the hold", () => {
+    const original_element = globalThis.Element;
+    globalThis.Element = class {};
+    try {
+        const g = game();
+        const { input, timers } = input_harness(g);
+        const button = Object.assign(new Element(), hand_button(g, 'grandpa_screen_saver'));
+        const event = { target: button, pointerType: 'touch', clientX: 100, clientY: 100, preventDefault() {} };
+        input.begin_hand_press(event);
+        assert.equal(timers.size, 1);
+        input.move_hand_press({ clientX: 120, clientY: 100 });
+        assert.equal(timers.size, 0, 'horizontal scrolling must not open inspection');
+        input.begin_hand_press(event);
+        const timer = [...timers.values()][0];
+        assert.equal(timer.delay, 550);
+        timer.callback();
+        input.cancel_hand_press();
+        input.handle_click(event);
+        assert.equal(input.view_state.inspected_card.definition_id, 'grandpa_screen_saver');
+        assert.equal(g.human.cards_played_this_turn, 0, 'release after holding must not play');
+        input.view_state.inspected_card = null;
+        input.begin_hand_press(event);
+        input.cancel_hand_press();
+        input.handle_click(event);
+        assert.equal(g.human.defenses[0].current_shields, 4, 'ordinary tap plays immediately');
+    } finally {
+        if (original_element === undefined) delete globalThis.Element;
+        else globalThis.Element = original_element;
+    }
+});
+
 test("single-player starts and rotates directly into Play, drawing exactly once per turn", () => {
     const g = game();
     assert.equal(g.state.phase, PHASES.PLAY);

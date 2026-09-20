@@ -68,7 +68,7 @@ export class UIHandler {
                 <p>Draw one card at the start of your turn, then play a card. Attack deals damage, Defense absorbs it first, Healing restores HP, Draw adds cards, and Play Again grants another card play.</p>
                 <p>If you still must play but your hand is empty, draw 2. An empty draw pile is refilled by shuffling your discard pile. If no cards are available, do as much as possible.</p>
                 <p>With 5 or 6 living players, standard attacks target your nearest living neighbor on either side. Area attacks and Mighty Powers are exempt; a card's forced target overrides the normal choice.</p>
-                <p>Special effects are printed on their cards. Open Card skills at any seat for a reference. Hover over a face-up card to read it, or tap it to inspect. Other players' hands stay private.</p>
+                <p>Special effects are printed on their cards. Open Card skills at any seat for a reference. Hover to read a hand card; click or tap to play it. Right-click, hold, or press I to inspect without playing. Other players' hands stay private.</p>
                 <p>Initiative: everyone rolls a d20; highest goes first, and only tied leaders reroll. Then play proceeds clockwise. Initiative has no success or failure. Saving throws: meet or beat the card's difficulty (DC); only saves treat natural 20 as success and natural 1 as failure.</p>
                 <p>Hover over Your hand to peek. Click or tap the bar to keep it open or close it.</p>
             </details>
@@ -77,14 +77,9 @@ export class UIHandler {
 
     render_card_inspection(game_state, inspected_card) {
         const definition = get_card_definition(inspected_card.definition_id);
-        const player = game_state.get_active_player();
-        const can_play = inspected_card.instance_id !== null && player.player_type === PLAYER_TYPES.HUMAN &&
-            game_state.phase === PHASES.PLAY && game_state.actions_remaining > 0 &&
-            game_state.get_current_decision() === null && player.hand.some(card => card.instance_id === inspected_card.instance_id);
         return `<div class="modal-overlay"><section class="choice-modal card-inspection" role="dialog" aria-modal="true" aria-label="${this.escape_html(definition.name)}">
             <div class="inspection-face game-card ${this.card_renderer.get_theme_class(definition.character_id)} ${this.card_renderer.get_type_class(definition.type)}">${this.card_renderer.render_card_face(definition)}</div>
-            <p>${can_play ? 'Choose Play to use one card play. You will choose a target if this card needs one.' : 'Card reference. This card cannot be played from here.'}</p>
-            <div class="inspection-actions">${can_play ? `<button type="button" class="primary-action" data-action="select-card" data-card-instance-id="${this.escape_html(inspected_card.instance_id)}">Play ${this.escape_html(definition.name)}</button>` : ''}
+            <div class="inspection-actions">
             <button type="button" class="choice-button" data-action="close-inspection">Close</button></div>
         </section></div>`;
     }
@@ -468,7 +463,7 @@ export class UIHandler {
                 </section>
                 <section class="hand-dock ${view_state.hand_pinned ? 'hand-open' : ''}" aria-label="Hand drawer">
                     <div id="hand-panel" class="hand-panel" ${view_state.hand_pinned ? '' : 'inert'}>
-                        <p class="hand-instructions">${is_your_turn ? 'Hover to read. Tap a card for details, then choose Play.' : 'You can inspect your cards while the computer plays. Play them on your turn.'}</p>
+                        <p class="hand-instructions">${is_your_turn ? 'Hover to read. Click or tap to play. Right-click, hold, or press I for details.' : 'You can inspect your cards while the computer plays. Play them on your turn.'}</p>
                         <div class="hand-fan">${hand}</div>
                     </div>
                     <div class="hand-dock-toolbar">

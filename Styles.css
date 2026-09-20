@@ -882,6 +882,10 @@ button.game-card {
 .type-utility { border-color: #8b8171; }
 
 .hand-card {
+    z-index: var(--hand-index);
+    opacity: 1;
+    user-select: none;
+    -webkit-touch-callout: none;
     transform-origin: 50% 130%;
     transform: rotate(var(--hand-rotation)) translateY(8px);
     transition: transform 130ms ease, filter 130ms ease;
@@ -889,10 +893,13 @@ button.game-card {
 
 .hand-card:hover:not(:disabled),
 .hand-card:focus-visible:not(:disabled) {
-    z-index: 20;
+    z-index: 1000;
     transform: rotate(0deg) translateY(-32px) scale(1.09);
     filter: brightness(1.05);
 }
+
+/* A disabled card still covers the cards beneath it; never fade the whole surface. */
+.hand-card:disabled {opacity: 1;}
 
 .table-card {
     --card-width: 92px;
@@ -1394,11 +1401,13 @@ button.game-card {
 .hand-open .hand-panel {visibility: visible; opacity: 1; pointer-events: auto; transform: none;}
 .hand-instructions {margin: 0 0 4px; text-align: center; font-size: .8rem; color: #c8cfba;}
 .hand-fan {
-    display: flex; justify-content: safe center; align-items: flex-start;
-    gap: 18px; overflow-x: auto; padding: 80px 24px 14px;
+    display: flex; justify-content: safe center; align-items: flex-end;
+    isolation: isolate;
+    gap: 0; overflow-x: auto; padding: 80px 64px 24px;
     overscroll-behavior: contain;
 }
 .hand-fan .hand-card {--card-width: 216px; --card-height: 316px; margin: 0;}
+.hand-fan .hand-card + .hand-card {margin-left: -22px;}
 .hand-card .card-frame {grid-template-rows: 38px 80px 30px minmax(80px, 1fr) 30px;}
 .hand-card .card-name {font-size: .82rem;}
 .hand-card .card-rule-box {font-size: .72rem;}
@@ -1662,7 +1671,8 @@ button.game-card {
     .opponent-rail .player-playmat {scroll-snap-align: start;}
     .hand-toggle {flex-direction: column; justify-content: center; gap: 2px; padding: 6px;}
     .hand-dock-toolbar {gap: 8px;}
-      .hand-fan {justify-content: flex-start; gap: 14px; padding: 80px 24px 16px;}
+    .hand-fan {justify-content: flex-start; gap: 0; padding: 80px 64px 24px;}
+    .hand-fan .hand-card + .hand-card {margin-left: -32px;}
     .hand-fan .hand-card {--card-width: 198px; --card-height: 306px;}
     .combat-log-drawer {right: 8px; bottom: 8px;}
     .modal-overlay {padding: 10px;}
