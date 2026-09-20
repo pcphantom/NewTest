@@ -93,6 +93,11 @@ export class UIHandler {
         return definition.rules_text + (definition.skill === null ? '' : ` ${definition.skill.name}: ${definition.skill.description}`);
     }
 
+    render_build_label() {
+        const build = this.document.querySelector?.('meta[name="game-build"]')?.content;
+        return build ? `<small class="build-label">Build ${this.escape_html(build)}</small>` : '';
+    }
+
     render_skills(player) {
         const character = get_character_definition(player.character_id);
         const cards = get_card_definitions_for_character(player.character_id).filter(card => card.effect_id !== 'standard' || card.skill !== null);
@@ -114,7 +119,8 @@ export class UIHandler {
             return;
         }
         if (game_state.phase === PHASES.HANDOFF) {
-            this.render_handoff(game_state);
+            if (game_state.is_hotseat()) this.render_handoff(game_state);
+            else this.render_table(game_state, rules_engine, turn_handler, view_state);
             return;
         }
         if (game_state.phase === PHASES.GAME_OVER) {
@@ -156,6 +162,7 @@ export class UIHandler {
                     <div class="title-eyebrow">Mini Multiplayer Offline RPG</div>
                     <h1>Dungeons <span>&amp;</span> Mayhem</h1>
                     <p>Python's Quest for the Holy Kale</p>
+                    ${this.render_build_label()}
                 </section>
 
                 <section class="menu-board">
@@ -377,6 +384,7 @@ export class UIHandler {
                     <h1>Pass to ${this.escape_html(player.name)}</h1>
                     <p>${this.escape_html(character.name)}</p>
                     <p class="muted">Your hand stays hidden until you reveal the table.</p>
+                    ${this.render_build_label()}
                     <button type="button" class="primary-action" data-action="reveal-turn" data-player-id="${this.escape_html(player.id)}">Reveal My Hand</button>
                 </section>
             </main>
@@ -385,7 +393,7 @@ export class UIHandler {
 
     render_table(game_state, rules_engine, turn_handler, view_state) {
         const active_player = game_state.get_active_player();
-        const viewing_player = game_state.game_mode === GAME_MODES.SINGLE_PLAYER
+        const viewing_player = !game_state.is_hotseat()
             ? game_state.players.find(player => player.player_type === PLAYER_TYPES.HUMAN) ?? active_player
             : active_player;
         const is_your_turn = viewing_player.id === active_player.id && viewing_player.player_type === PLAYER_TYPES.HUMAN;
@@ -411,6 +419,8 @@ export class UIHandler {
                         <strong>Turn ${game_state.turn_number}</strong>
                         <span>Round ${game_state.round_number}</span>
                         <span>Actions ${game_state.actions_remaining}</span>
+                        <span>${game_state.is_hotseat() ? 'Hotseat' : `Single player: ${game_state.players.filter(player => player.player_type === PLAYER_TYPES.COMPUTER).length} CPU(s)`}</span>
+                        ${this.render_build_label()}
                     </div>
                     <button type="button" class="table-menu-button" data-action="toggle-fullscreen">${this.document.fullscreenElement === null ? 'Full screen' : 'Exit full screen'}</button>
                 </header>
@@ -580,7 +590,7 @@ export class UIHandler {
         }
 
         if (decision.type === DECISION_TYPES.DISCARD_CARDS) {
-            if (game_state.game_mode === GAME_MODES.LOCAL_MULTIPLAYER && !view_state.private_decision_revealed) {
+            if (game_state.is_hotseat() && !view_state.private_decision_revealed) {
                 return `
                     <div class="modal-overlay">
                         <div class="choice-modal" role="dialog" aria-modal="true" aria-label="Private Hand Choice">

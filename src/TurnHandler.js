@@ -7,7 +7,6 @@
 import {
     BASE_ACTIONS_PER_TURN,
     CARDS_DRAWN_PER_TURN,
-    GAME_MODES,
     INITIATIVE_DIE_SIDES,
     OPENING_HAND_SIZE,
     PHASES,
@@ -120,7 +119,7 @@ export class TurnHandler {
     }
 
     prepare_active_turn() {
-        if (this.game_state.game_mode === GAME_MODES.LOCAL_MULTIPLAYER) {
+        if (this.game_state.is_hotseat()) {
             this.game_state.phase = PHASES.HANDOFF;
         } else {
             this.begin_active_turn();

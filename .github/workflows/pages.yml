@@ -25,6 +25,9 @@ jobs:
       - name: Test
         run: npm test
 
+      - name: Verify matching asset versions
+        run: node scripts/version-assets.mjs --check
+
       - name: Validate static entry
         run: |
           test -f index.html

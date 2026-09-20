@@ -18,7 +18,7 @@ async function setup(viewport, touch = false) {
     const page = await context.newPage();
     page.on("pageerror", error => errors.push(error.message));
     // Test-only observability: the production bootstrap exports no global state.
-    await page.route("**/src/GameBootstrap.js", async route => {
+    await page.route(/\/src\/GameBootstrap\.js(?:\?.*)?$/, async route => {
         const response = await route.fetch();
         await route.fulfill({ response, body: await response.text() + "\nwindow.testGame = { game_state, rules_engine, turn_handler, dice_handler, input_handler };" });
     });
@@ -79,10 +79,11 @@ try {
         const cards = page.locator(".hand-card");
         if (!touch) {
             await cards.first().hover();
-            const preview = await page.locator("#card-hover-preview").boundingBox();
-            assert.ok(preview.width >= 350, "hover preview is large");
-            assert.ok(preview.y >= 0 && preview.y + preview.height <= height + 1, "preview is not clipped vertically");
-            assert.ok(preview.x >= 0 && preview.x + preview.width <= width + 1, "preview is not clipped horizontally");
+            const card = await cards.first().boundingBox();
+            const fan = await page.locator('.hand-fan').boundingBox();
+            assert.equal(await page.locator('#card-hover-preview').isVisible(), false, 'hand hover does not spawn a floating copy');
+            assert.ok(card.width > 216 && card.width < 240, 'the original card scales proportionally');
+            assert.ok(card.y >= fan.y && card.y >= 0, 'lifted card is not clipped at the top');
             await page.screenshot({path:join(output, `hover-${width}.png`)});
         }
         const before = await page.evaluate(() => JSON.stringify(testGame.game_state));
@@ -211,9 +212,11 @@ try {
         input_handler.render();
     });
     await page.locator('.hand-card[data-card-definition-id="patchadin_blatant_favoritism"]').first().hover();
-    assert.equal(await page.locator('#card-hover-preview .symbol-value').count(), 4);
-    assert.match(await page.locator('#card-hover-preview').innerText(), /Developer's Favorite/);
-    const v2Preview = await page.locator('#card-hover-preview').boundingBox();
+    assert.equal(await page.locator('#card-hover-preview').isVisible(), false);
+    const v2Card = page.locator('.hand-card[data-card-definition-id="patchadin_blatant_favoritism"]').first();
+    assert.equal(await v2Card.locator('.symbol-value').count(), 4);
+    assert.match(await v2Card.innerText(), /Developer's Favorite/);
+    const v2Preview = await v2Card.boundingBox();
     assert.ok(v2Preview.y >= 0 && v2Preview.y + v2Preview.height <= 901);
     await page.screenshot({path:join(output,'v2-blatant-hover.png')});
     await page.locator('.hand-card[data-card-definition-id="patchadin_blatant_favoritism"]').first().click();

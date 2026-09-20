@@ -12,7 +12,10 @@
     status.textContent = "Loading the game...";
     const script = document.createElement("script");
     script.type = "module";
-    script.src = new URL("./GameBootstrap.js", document.currentScript.src).href;
+    const startup_url = new URL(document.currentScript.src);
+    const bootstrap_url = new URL("./GameBootstrap.js", startup_url);
+    bootstrap_url.search = startup_url.search;
+    script.src = bootstrap_url.href;
 
     const stop_startup_listeners = () => {
         window.removeEventListener("error", show_startup_error);

@@ -5,8 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="color-scheme" content="dark">
     <meta name="theme-color" content="#12131a">
+    <meta name="game-build" content="e9db4905ba6b">
     <title>Dungeons &amp; Mayhem</title>
-    <link rel="stylesheet" href="./Styles.css">
+    <link rel="stylesheet" href="./Styles.css?v=e9db4905ba6b">
 </head>
 <body>
     <div class="crt-shell">
@@ -26,6 +27,25 @@
             </main>
         </div>
     </div>
-    <script defer src="./src/Startup.js"></script>
+    <!-- versioned-modules:start -->
+    <script type="importmap">{
+  "imports": {
+    "./src/AIPlayerHandler.js": "./src/AIPlayerHandler.js?v=e9db4905ba6b",
+    "./src/CardData.js": "./src/CardData.js?v=e9db4905ba6b",
+    "./src/CardRenderer.js": "./src/CardRenderer.js?v=e9db4905ba6b",
+    "./src/CharacterData.js": "./src/CharacterData.js?v=e9db4905ba6b",
+    "./src/Constants.js": "./src/Constants.js?v=e9db4905ba6b",
+    "./src/DeckHandler.js": "./src/DeckHandler.js?v=e9db4905ba6b",
+    "./src/DiceHandler.js": "./src/DiceHandler.js?v=e9db4905ba6b",
+    "./src/GameBootstrap.js": "./src/GameBootstrap.js?v=e9db4905ba6b",
+    "./src/GameState.js": "./src/GameState.js?v=e9db4905ba6b",
+    "./src/InputHandler.js": "./src/InputHandler.js?v=e9db4905ba6b",
+    "./src/RulesEngine.js": "./src/RulesEngine.js?v=e9db4905ba6b",
+    "./src/TurnHandler.js": "./src/TurnHandler.js?v=e9db4905ba6b",
+    "./src/UIHandler.js": "./src/UIHandler.js?v=e9db4905ba6b"
+  }
+}</script>
+    <!-- versioned-modules:end -->
+    <script defer src="./src/Startup.js?v=e9db4905ba6b"></script>
 </body>
 </html>

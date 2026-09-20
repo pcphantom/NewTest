@@ -890,7 +890,7 @@ button.game-card {
 .hand-card:hover:not(:disabled),
 .hand-card:focus-visible:not(:disabled) {
     z-index: 20;
-    transform: rotate(0deg) translateY(-8px);
+    transform: rotate(0deg) translateY(-32px) scale(1.09);
     filter: brightness(1.05);
 }
 
@@ -1332,6 +1332,8 @@ button.game-card {
     text-align: center;
 }
 
+.build-label {display: block; color: var(--muted); font: .65rem/1.4 "Courier New", monospace;}
+
 .recent-actions {
     padding: 0 10px 8px;
     color: var(--ink);
@@ -1393,7 +1395,7 @@ button.game-card {
 .hand-instructions {margin: 0 0 4px; text-align: center; font-size: .8rem; color: #c8cfba;}
 .hand-fan {
     display: flex; justify-content: safe center; align-items: flex-start;
-    gap: 18px; overflow-x: auto; padding: 18px 14px 14px;
+    gap: 18px; overflow-x: auto; padding: 80px 24px 14px;
     overscroll-behavior: contain;
 }
 .hand-fan .hand-card {--card-width: 216px; --card-height: 316px; margin: 0;}
@@ -1599,8 +1601,8 @@ button.game-card {
 .table-card .symbol-glyph {font-size: 19px;}
 .table-card .symbol-value {font-size: 14px; -webkit-text-stroke-width: 1.5px;}
 .card-rule-box {overflow: hidden;}
-.card-hover-preview {position: fixed; z-index: 70; pointer-events: none; width: min(420px, calc(100vw - 16px)); transform-origin: top left;}
-.card-hover-preview .inspection-face {max-width: none;}
+.card-hover-preview {position: fixed; z-index: 70; pointer-events: none; width: min(320px, calc(100vw - 16px)); transform-origin: top left;}
+.card-hover-preview .inspection-face {max-width: none; aspect-ratio: 216 / 316; display: grid;}
 .card-hover-preview .card-rule-box {font-size: 1rem;}
 .card-hover-preview .card-name {font-size: 1.2rem;}
 .card-hover-preview .card-flavor-box {font-size: .9rem;}
@@ -1660,7 +1662,7 @@ button.game-card {
     .opponent-rail .player-playmat {scroll-snap-align: start;}
     .hand-toggle {flex-direction: column; justify-content: center; gap: 2px; padding: 6px;}
     .hand-dock-toolbar {gap: 8px;}
-    .hand-fan {justify-content: flex-start; gap: 14px; padding: 16px 8px;}
+      .hand-fan {justify-content: flex-start; gap: 14px; padding: 80px 24px 16px;}
     .hand-fan .hand-card {--card-width: 198px; --card-height: 306px;}
     .combat-log-drawer {right: 8px; bottom: 8px;}
     .modal-overlay {padding: 10px;}

@@ -145,6 +145,11 @@ export class GameState {
         return player;
     }
 
+    is_hotseat() {
+        return this.game_mode === GAME_MODES.LOCAL_MULTIPLAYER && this.players.length > 1 &&
+            this.players.every(player => player.player_type === PLAYER_TYPES.HUMAN);
+    }
+
     get_living_players() {
         return this.players.filter((player) => !player.eliminated);
     }

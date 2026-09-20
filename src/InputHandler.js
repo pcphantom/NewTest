@@ -629,8 +629,12 @@ export class InputHandler {
     }
 
     render() {
+        // A handoff is a pending turn-start, never a privacy gate in a CPU match.
+        if (this.game_state.phase === PHASES.HANDOFF && !this.game_state.is_hotseat()) {
+            this.turn_handler.reveal_active_turn(this.game_state.get_active_player().id);
+        }
         const same_turn = this.game_state.phase === PHASES.PLAY && this.rendered_turn_number === this.game_state.turn_number;
-        const single_player = this.game_state.game_mode === GAME_MODES.SINGLE_PLAYER;
+        const single_player = this.game_state.players.length > 0 && !this.game_state.is_hotseat();
         const scroll_positions = (same_turn || (single_player && this.game_state.phase === PHASES.PLAY)) ? ['.game-table', '.opponent-rail', '.hand-fan'].map(selector => {
             const node = this.app_element.querySelector(selector);
             return {selector, x: node?.scrollLeft ?? 0, y: node?.scrollTop ?? 0};
@@ -678,6 +682,8 @@ export class InputHandler {
         }
         const card = event.target.closest('[data-action="inspect-card"]');
         if (card === null || card.contains(event.relatedTarget) || this.app_element.querySelector('.modal-overlay') !== null) return;
+        // Hand cards use their original in-place lift, not a second floating card.
+        if (card.classList.contains('hand-card')) return;
         const definition = get_card_definition(card.dataset.cardDefinitionId);
         const preview = this.app_element.querySelector('#card-hover-preview');
         preview.innerHTML = `<div class="game-card inspection-face ${this.ui_handler.card_renderer.get_theme_class(definition.character_id)} ${this.ui_handler.card_renderer.get_type_class(definition.type)}">${this.ui_handler.card_renderer.render_card_face(definition)}</div>`;

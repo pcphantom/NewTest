@@ -32,6 +32,7 @@ The d12 at each seat is labeled Health and tracks current HP; it is not rolled. 
 - Hover over Your hand to peek; move away to close. Click/tap pins it open or closes it.
 - In Single Player, your hand opens automatically on your turn and folds away when the computer starts, so you can watch the board. You can still inspect your own cards during computer turns. Discard choices open directly, without a privacy prompt. Computer hands remain private.
 - Hover a face-up card for a large preview. Click/tap to read its full rules and flavor text; choose Play to use a hand card.
+- Hand-card hover uses the original proportional lift and small enlargement. It does not open a second floating copy. Public table cards still have a portrait-shaped reading preview.
 - Card skills at each seat explains the cards carrying that character's special effects. Opponents' private hands are never exposed.
 - Menu pauses the current match. Resume preserves hands, turns and pending choices. Ending a match requires confirmation.
 - Full screen is available on supported browsers. The hand bar remains in the viewport on desktop and mobile; smaller screens can scroll the board and swipe opponent seats.
@@ -76,6 +77,8 @@ Card illustrations are separate from card gameplay data. The runtime card render
 - `tests/`: deterministic rule, data, initiative and computer-player tests
 
 ## Tests
+
+After changing game JavaScript or CSS, run `npm run build` before testing and publishing. This stamps `index.html`, the stylesheet, and the entire module graph with a matching content hash. The title screen and table show this build ID, and CI checks it is current. This prevents a newly deployed page from reusing older unversioned modules from browser cache.
 
 ```bash
 npm test

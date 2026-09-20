@@ -82,6 +82,47 @@ test("a computer initiative winner also starts without a handoff", () => {
     assert.equal(g.cpu.hand.length, 4);
 });
 
+test("the actual single-player setup with two CPUs never creates a handoff for any initiative winner", () => {
+    for (const rolls of [[.95, .1, .5], [.1, .95, .5], [.1, .5, .95]]) {
+        const g = game();
+        const h = input_harness(g);
+        h.input.sync_single_setup_inputs = () => {};
+        h.input.view_state.single_player_count = 3;
+        h.input.start_single_player();
+        h.input.clear_automatic_timer();
+        g.rules.dice_handler.random_number_generator = () => rolls.shift() ?? .5;
+        assert.equal(g.state.game_mode, GAME_MODES.SINGLE_PLAYER);
+        assert.equal(g.state.players.filter(p => p.player_type === PLAYER_TYPES.COMPUTER).length, 2);
+        while (g.state.phase === PHASES.INITIATIVE) g.turns.roll_initiative(g.state.get_next_initiative_player().id);
+        for (let turn = 0; turn < 9; turn++) {
+            assert.equal(g.state.phase, PHASES.PLAY);
+            assert.equal(g.state.is_hotseat(), false);
+            const { ui, app, view } = ui_harness();
+            ui.render_game(g.state, g.rules, g.turns, view);
+            assert.doesNotMatch(app.innerHTML, /Reveal My Hand|Pass to /);
+            g.state.actions_remaining = 0;
+            g.turns.end_turn(g.state.get_active_player().id);
+        }
+    }
+});
+
+test("a CPU match cannot display privacy handoff even with a mismatched mode or pending legacy handoff", () => {
+    const g = game();
+    g.state.game_mode = GAME_MODES.LOCAL_MULTIPLAYER;
+    assert.equal(g.state.is_hotseat(), false);
+    g.state.phase = PHASES.HANDOFF;
+    g.state.actions_remaining = 0;
+    const { ui, app, view } = ui_harness();
+    ui.render_game(g.state, g.rules, g.turns, view);
+    assert.doesNotMatch(app.innerHTML, /Reveal My Hand|Pass to /);
+    const h = input_harness(g);
+    const cards_before = g.human.hand.length;
+    h.input.render();
+    h.input.render();
+    assert.equal(g.state.phase, PHASES.PLAY);
+    assert.equal(g.human.hand.length, cards_before + 1, 'pending turn starts only once');
+});
+
 test("hotseat preserves handoff and waits to draw until that player reveals", () => {
     const g = game(GAME_MODES.LOCAL_MULTIPLAYER);
     assert.equal(g.state.phase, PHASES.HANDOFF);
