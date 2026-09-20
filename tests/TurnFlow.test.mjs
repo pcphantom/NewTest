@@ -247,7 +247,7 @@ test("computer combo cards render separately and stay visible before its turn en
     h.tick();
     assert.equal(g.state.get_active_player(), g.human);
     assert.equal(g.state.phase, PHASES.PLAY);
-    assert.equal(h.frames.at(-1).hand_open, true);
+    assert.equal(h.frames.at(-1).hand_open, false, 'CPU plays remain visible when the human turn starts');
     assert.equal(h.frames.at(-1).last_play.definition_id, "malric_defensive_stance");
     assert.equal(h.timers.size, 0);
 });
@@ -304,11 +304,14 @@ test("computer decisions do not cover the board with a privacy overlay", () => {
     assert.equal(ui.render_decision_overlay(g.state, decision, view), "");
 });
 
-test("hand auto-opens only on a new human turn; pause and inspection stop the CPU timer", () => {
+test("turn changes never auto-pin the hand; pause and inspection stop the CPU timer", () => {
     const g = game();
     const h = input_harness(g);
     h.input.render();
-    assert.equal(h.frames.at(-1).hand_open, true);
+    assert.equal(h.frames.at(-1).hand_open, false, 'the board stays visible at the start of a human turn');
+    h.input.view_state.hand_pinned = true;
+    h.input.render();
+    assert.equal(h.frames.at(-1).hand_open, true, 'only a deliberate pin persists within the turn');
     h.input.view_state.hand_pinned = false;
     h.input.render();
     assert.equal(h.frames.at(-1).hand_open, false, "manual closing persists during the same turn");
@@ -326,4 +329,71 @@ test("hand auto-opens only on a new human turn; pause and inspection stop the CP
     }
     h.input.render();
     assert.equal(h.timers.size, 1);
+});
+
+test("hover, click, touch and Escape can dismiss the hand before playing any card", () => {
+    const original_element = globalThis.Element;
+    globalThis.Element = class {};
+    try {
+        const g = game();
+        const { input } = input_harness(g);
+        input.render();
+        const before = JSON.stringify(g.state);
+        const panel = { inert: true };
+        const hint = { textContent: '' };
+        let open = false;
+        let expanded = 'false';
+        const dock = new Element();
+        const button = Object.assign(new Element(), {
+            dataset: { action: 'toggle-hand' },
+            classList: { contains: () => false },
+            setAttribute: (key, value) => { if (key === 'aria-expanded') expanded = value; },
+            closest: selector => selector === '.hand-dock' ? dock : selector === 'button[data-action]' ? button : null,
+        });
+        dock.contains = node => node === button || node === panel;
+        dock.classList = { toggle: (name, value) => { if (name === 'hand-open') open = value; } };
+        dock.querySelector = selector => ({ '#hand-panel': panel, '[data-action="toggle-hand"]': button, '[data-hand-hint]': hint })[selector];
+        input.app_element.querySelector = selector => selector === '.hand-dock' ? dock : null;
+        const enter = { target: button, relatedTarget: null, pointerType: 'mouse' };
+        const leave = { target: button, relatedTarget: null, pointerType: 'mouse' };
+        const click = { target: button, preventDefault() {} };
+
+        input.handle_pointer_over(enter);
+        assert.equal(open, true);
+        assert.equal(input.view_state.hand_pinned, false, 'hover must never pin the hand');
+        assert.equal(hint.textContent, 'Click to keep open');
+        input.handle_pointer_out(leave);
+        assert.equal(open, false, 'moving away immediately restores the board');
+        assert.equal(panel.inert, true);
+
+        input.handle_pointer_over(enter);
+        input.handle_click(click);
+        input.handle_pointer_out(leave);
+        assert.equal(open, true, 'a deliberate click keeps the hand open');
+        assert.equal(hint.textContent, 'Close');
+        input.handle_pointer_over(enter);
+        input.handle_click(click);
+        assert.equal(open, false, 'the same bar closes it before playing');
+        assert.equal(expanded, 'false');
+        input.handle_pointer_over(enter);
+        assert.equal(open, false, 'the pointer left on Close must not reopen it');
+        input.handle_pointer_out(leave);
+        input.handle_pointer_over(enter);
+        assert.equal(open, true, 'hover works again after leaving and re-entering');
+
+        input.handle_keydown({ key: 'Escape', target: button });
+        input.update_hand_drawer();
+        assert.equal(open, false, 'Escape closes without a card play');
+        input.handle_pointer_out(leave);
+        input.handle_pointer_over({ ...enter, pointerType: 'touch' });
+        assert.equal(open, false, 'touch does not generate a hover peek');
+        input.handle_click(click);
+        assert.equal(open, true, 'first tap opens');
+        input.handle_click(click);
+        assert.equal(open, false, 'second tap closes');
+        assert.equal(JSON.stringify(g.state), before, 'all drawer interactions leave cards, actions, HP and turn untouched');
+    } finally {
+        if (original_element === undefined) delete globalThis.Element;
+        else globalThis.Element = original_element;
+    }
 });

@@ -701,9 +701,9 @@ export class InputHandler {
         if (this.game_state.phase !== PHASES.PLAY) {
             this.view_state.hand_pinned = false;
         } else if (single_player && !same_turn) {
-            // Show the board during CPU turns, and open the human hand without a privacy gate.
-            this.view_state.hand_pinned = this.game_state.get_active_player().player_type === PLAYER_TYPES.HUMAN;
-            this.hand_hover_suppressed = !this.view_state.hand_pinned;
+            // A new turn must not pin the drawer over the board. Only the player pins it.
+            this.view_state.hand_pinned = false;
+            this.hand_hover_suppressed = this.game_state.get_active_player().player_type === PLAYER_TYPES.COMPUTER;
         }
         this.hand_hovered = false;
         this.ui_handler.render(this.game_state, this.rules_engine, this.turn_handler, this.view_state);
@@ -728,7 +728,9 @@ export class InputHandler {
         dock.classList.toggle('hand-open', open);
         dock.querySelector('#hand-panel').inert = !open;
         dock.querySelector('[data-action="toggle-hand"]').setAttribute('aria-expanded', String(open));
-        dock.querySelector('[data-hand-hint]').textContent = this.view_state.hand_pinned ? 'Close' : 'Hover or tap to open';
+        dock.querySelector('[data-hand-hint]').textContent = this.view_state.hand_pinned
+            ? 'Close'
+            : open ? 'Click to keep open' : 'Hover or tap to open';
     }
 
     handle_pointer_over(event) {

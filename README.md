@@ -30,7 +30,7 @@ The d12 at each seat is labeled Health and tracks current HP; it is not rolled. 
 ## Table controls
 
 - Hover over Your hand to peek; move away to close. Click/tap pins it open or closes it.
-- In Single Player, your hand opens automatically on your turn and folds away when the computer starts, so you can watch the board. You can still inspect your own cards during computer turns. Discard choices open directly, without a privacy prompt. Computer hands remain private.
+- Your hand never pins itself open at turn start. Hover temporarily peeks; moving away restores the board. Click/tap pins the drawer, and clicking/tapping the same bar again closes it immediately, even before playing a card. Escape also closes it. In Single Player, the drawer folds away when the computer starts; your cards remain available to inspect. Discard choices open directly, without a privacy prompt. Computer hands remain private.
 - Click/tap a playable hand card to play it immediately. Only effects requiring a target or another real choice open a prompt. Right-click, touch and hold, or focus a card and press I to read its full rules without playing it. Unplayable hand cards and public table cards open their details on click/tap.
 - The hand keeps its original overlapping fan, proportional hover lift and small enlargement. Cards stay opaque, including when they cannot be played. A hovered card comes fully to the front without opening a second floating copy. Public table cards still have a portrait-shaped reading preview.
 - Card skills at each seat explains the cards carrying that character's special effects. Opponents' private hands are never exposed.
