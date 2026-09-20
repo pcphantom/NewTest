@@ -564,18 +564,6 @@ export class InputHandler {
             return;
         }
 
-        if (this.game_state.phase === PHASES.HANDOFF) {
-            const active_player = this.game_state.get_active_player();
-            if (active_player.player_type === PLAYER_TYPES.COMPUTER) {
-                this.automatic_action_timer = this.window.setTimeout(() => {
-                    this.automatic_action_timer = null;
-                    this.turn_handler.reveal_active_turn(active_player.id);
-                    this.render();
-                }, AI_ACTION_DELAY_MS);
-            }
-            return;
-        }
-
         if (this.game_state.phase !== PHASES.PLAY) return;
 
         const decision = this.game_state.get_current_decision();
@@ -584,14 +572,8 @@ export class InputHandler {
             if (decision_player.player_type === PLAYER_TYPES.COMPUTER) {
                 this.automatic_action_timer = this.window.setTimeout(() => {
                     this.automatic_action_timer = null;
-                    this.ai_player_handler.resolve_computer_decisions();
-                    if (
-                        this.game_state.phase === PHASES.PLAY &&
-                        this.game_state.get_active_player().player_type === PLAYER_TYPES.COMPUTER
-                    ) {
-                        this.ai_player_handler.take_active_turn();
-                    }
-                    this.render();
+                    this.ai_player_handler.take_next_action();
+                    this.after_mutation();
                 }, AI_ACTION_DELAY_MS);
             }
             return;
@@ -601,8 +583,8 @@ export class InputHandler {
         if (active_player.player_type === PLAYER_TYPES.COMPUTER) {
             this.automatic_action_timer = this.window.setTimeout(() => {
                 this.automatic_action_timer = null;
-                this.ai_player_handler.take_active_turn();
-                this.render();
+                this.ai_player_handler.take_next_action();
+                this.after_mutation();
             }, AI_ACTION_DELAY_MS);
         }
     }
@@ -648,11 +630,18 @@ export class InputHandler {
 
     render() {
         const same_turn = this.game_state.phase === PHASES.PLAY && this.rendered_turn_number === this.game_state.turn_number;
-        const scroll_positions = same_turn ? ['.game-table', '.opponent-rail', '.hand-fan'].map(selector => {
+        const single_player = this.game_state.game_mode === GAME_MODES.SINGLE_PLAYER;
+        const scroll_positions = (same_turn || (single_player && this.game_state.phase === PHASES.PLAY)) ? ['.game-table', '.opponent-rail', '.hand-fan'].map(selector => {
             const node = this.app_element.querySelector(selector);
             return {selector, x: node?.scrollLeft ?? 0, y: node?.scrollTop ?? 0};
         }) : [];
-        if (this.game_state.phase !== PHASES.PLAY || this.game_state.get_active_player().player_type !== PLAYER_TYPES.HUMAN) this.view_state.hand_pinned = false;
+        if (this.game_state.phase !== PHASES.PLAY) {
+            this.view_state.hand_pinned = false;
+        } else if (single_player && !same_turn) {
+            // Show the board during CPU turns, and open the human hand without a privacy gate.
+            this.view_state.hand_pinned = this.game_state.get_active_player().player_type === PLAYER_TYPES.HUMAN;
+            this.hand_hover_suppressed = !this.view_state.hand_pinned;
+        }
         this.hand_hovered = false;
         this.ui_handler.render(this.game_state, this.rules_engine, this.turn_handler, this.view_state);
         this.rendered_turn_number = this.game_state.phase === PHASES.PLAY ? this.game_state.turn_number : null;

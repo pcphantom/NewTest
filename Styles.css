@@ -295,6 +295,23 @@ p {
     width: min(1050px, 100%);
 }
 
+.startup-panel {
+    overflow-wrap: anywhere;
+    line-height: 1.5;
+}
+
+.startup-panel pre {
+    white-space: pre-wrap;
+    padding: 12px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--panel-deep);
+}
+
+.startup-panel a {
+    color: var(--gold);
+}
+
 .back-button {
     margin-bottom: 24px;
     background: #121419;
@@ -1307,6 +1324,22 @@ button.game-card {
     display: grid;
     place-items: center;
 }
+
+.last-play-caption {
+    margin: 0 0 8px;
+    color: var(--ink);
+    font-size: .8rem;
+    text-align: center;
+}
+
+.recent-actions {
+    padding: 0 10px 8px;
+    color: var(--ink);
+    font-size: .75rem;
+    line-height: 1.4;
+}
+
+.recent-actions p {margin: 4px 0;}
 
 .empty-last-play {
     width: 92px;

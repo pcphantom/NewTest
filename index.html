@@ -10,9 +10,22 @@
 </head>
 <body>
     <div class="crt-shell">
-        <div id="app" class="app" aria-live="polite"></div>
+        <div id="app" class="app" aria-live="polite">
+            <main class="setup-screen">
+                <section class="setup-panel startup-panel" aria-labelledby="startup-heading">
+                    <div class="screen-kicker">Dungeons &amp; Mayhem</div>
+                    <h1 id="startup-heading">Start the game</h1>
+                    <p id="startup-status" role="status">The game has not started yet. Opening this file directly will not load the game.</p>
+                    <p>This game needs a web server to load its JavaScript modules. Keep the whole project folder together, including <code>src</code> and <code>Styles.css</code>.</p>
+                    <p>For local play, open a terminal in the <strong>NewTest</strong> folder and run:</p>
+                    <pre><code>python -m http.server 8765 --bind 127.0.0.1</code></pre>
+                    <p>Keep that terminal running, then <a href="http://127.0.0.1:8765/">open the local game</a>. If the server is already running, just use the link.</p>
+                    <p>For the published game, use its GitHub Pages address instead of downloading only this HTML file.</p>
+                    <noscript>Enable JavaScript in your browser to play.</noscript>
+                </section>
+            </main>
+        </div>
     </div>
-    <noscript>This game requires JavaScript.</noscript>
-    <script type="module" src="./src/GameBootstrap.js"></script>
+    <script defer src="./src/Startup.js"></script>
 </body>
 </html>

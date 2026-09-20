@@ -369,21 +369,6 @@ export class UIHandler {
         const player = game_state.get_active_player();
         const character = get_character_definition(player.character_id);
 
-        if (player.player_type === PLAYER_TYPES.COMPUTER) {
-            this.app_element.innerHTML = `
-                <main class="handoff-screen">
-                    <section class="handoff-card">
-                        ${this.card_renderer.render_character_portrait(player.character_id, "portrait-large")}
-                        <div class="screen-kicker">Turn ${game_state.turn_number}</div>
-                        <h1>${this.escape_html(player.name)}</h1>
-                        <p>${this.escape_html(character.name)}</p>
-                        <div class="computer-thinking">Computer turn in progress...</div>
-                    </section>
-                </main>
-            `;
-            return;
-        }
-
         this.app_element.innerHTML = `
             <main class="handoff-screen">
                 <section class="handoff-card">
@@ -400,14 +385,20 @@ export class UIHandler {
 
     render_table(game_state, rules_engine, turn_handler, view_state) {
         const active_player = game_state.get_active_player();
+        const viewing_player = game_state.game_mode === GAME_MODES.SINGLE_PLAYER
+            ? game_state.players.find(player => player.player_type === PLAYER_TYPES.HUMAN) ?? active_player
+            : active_player;
+        const is_your_turn = viewing_player.id === active_player.id && viewing_player.player_type === PLAYER_TYPES.HUMAN;
+        const last_play = game_state.last_play;
+        const recent_actions = game_state.event_log.filter(event => !['system', 'draw', 'dice'].includes(event.tone)).slice(-3);
         const last_roll = [...game_state.event_log].reverse().find(event => event.tone === 'dice');
         const opponent_seats = game_state.players
-            .filter((player) => player.id !== active_player.id)
-            .map((player) => this.render_player_playmat(player, false))
+            .filter((player) => player.id !== viewing_player.id)
+            .map((player) => this.render_player_playmat(player, player.id === active_player.id))
             .join("");
 
-        const hand = active_player.player_type === PLAYER_TYPES.HUMAN
-            ? this.render_hand(active_player, game_state.actions_remaining > 0)
+        const hand = viewing_player.player_type === PLAYER_TYPES.HUMAN
+            ? this.render_hand(viewing_player, is_your_turn && game_state.actions_remaining > 0)
             : '<div class="hidden-computer-hand">Computer hand is hidden.</div>';
 
         const current_decision = game_state.get_current_decision();
@@ -439,17 +430,19 @@ export class UIHandler {
                             <div class="dice-tray-label">CARD PLAYS LEFT</div>
                             <div class="turn-orb">${game_state.actions_remaining}</div>
                             <div class="dice-tray-copy">${this.escape_html(active_player.name)} is active</div>
+                            ${current_decision !== null && game_state.get_player_by_id(current_decision.player_id).player_type === PLAYER_TYPES.COMPUTER ? `<div class="dice-tray-copy">${this.escape_html(game_state.get_player_by_id(current_decision.player_id).name)} is choosing...</div>` : ''}
                             ${last_roll === undefined ? '' : `<div class="last-roll"><strong>Last roll</strong> ${this.escape_html(last_roll.message)}</div>`}
+                            <div class="recent-actions" aria-label="Recent actions">${recent_actions.map(event => `<p>${this.escape_html(event.message)}</p>`).join('')}</div>
                         </div>
                         <div class="last-play-stage">
-                            ${active_player.last_played_card_definition_id === null
+                            ${last_play === null
                                 ? '<div class="empty-last-play">Play area</div>'
-                                : this.card_renderer.render_table_card_from_definition(active_player.last_played_card_definition_id, "current-play-card")}
+                                : `<p class="last-play-caption">${this.escape_html(game_state.get_player_by_id(last_play.player_id).name)} played ${this.escape_html(get_card_definition(last_play.definition_id).name)}</p>${this.card_renderer.render_table_card_from_definition(last_play.definition_id, "current-play-card")}`}
                         </div>
                     </div>
 
                     <div class="active-playmat">
-                        ${this.render_player_playmat(active_player, true)}
+                        ${this.render_player_playmat(viewing_player, is_your_turn)}
                     </div>
 
                     <aside class="combat-log-drawer">
@@ -465,12 +458,12 @@ export class UIHandler {
                 </section>
                 <section class="hand-dock ${view_state.hand_pinned ? 'hand-open' : ''}" aria-label="Hand drawer">
                     <div id="hand-panel" class="hand-panel" ${view_state.hand_pinned ? '' : 'inert'}>
-                        <p class="hand-instructions">Hover to read. Tap a card for details, then choose Play.</p>
+                        <p class="hand-instructions">${is_your_turn ? 'Hover to read. Tap a card for details, then choose Play.' : 'You can inspect your cards while the computer plays. Play them on your turn.'}</p>
                         <div class="hand-fan">${hand}</div>
                     </div>
                     <div class="hand-dock-toolbar">
-                        <button type="button" class="hand-toggle" data-action="toggle-hand" aria-controls="hand-panel" aria-expanded="${view_state.hand_pinned}">Your hand (${active_player.player_type === PLAYER_TYPES.HUMAN ? active_player.hand.length : 'hidden'}) <span data-hand-hint>${view_state.hand_pinned ? 'Close' : 'Hover or tap to open'}</span></button>
-                        <button type="button" class="table-menu-button" data-action="end-turn" data-player-id="${this.escape_html(active_player.id)}" ${active_player.player_type === PLAYER_TYPES.HUMAN && turn_handler.can_end_turn() ? "" : "disabled"}>End Turn</button>
+                        <button type="button" class="hand-toggle" data-action="toggle-hand" aria-controls="hand-panel" aria-expanded="${view_state.hand_pinned}">Your hand (${viewing_player.player_type === PLAYER_TYPES.HUMAN ? viewing_player.hand.length : 'hidden'}) <span data-hand-hint>${view_state.hand_pinned ? 'Close' : 'Hover or tap to open'}</span></button>
+                        <button type="button" class="table-menu-button" data-action="end-turn" data-player-id="${this.escape_html(active_player.id)}" ${is_your_turn && turn_handler.can_end_turn() ? "" : "disabled"}>End Turn</button>
                     </div>
                 </section>
             </main>
@@ -583,20 +576,14 @@ export class UIHandler {
         const player = game_state.get_player_by_id(decision.player_id);
 
         if (player.player_type === PLAYER_TYPES.COMPUTER) {
-            return `
-                <div class="modal-overlay">
-                    <div class="choice-modal">
-                        <div class="computer-thinking">${this.escape_html(player.name)} is deciding...</div>
-                    </div>
-                </div>
-            `;
+            return '';
         }
 
         if (decision.type === DECISION_TYPES.DISCARD_CARDS) {
-            if (!view_state.private_decision_revealed) {
+            if (game_state.game_mode === GAME_MODES.LOCAL_MULTIPLAYER && !view_state.private_decision_revealed) {
                 return `
                     <div class="modal-overlay">
-                        <div class="choice-modal">
+                        <div class="choice-modal" role="dialog" aria-modal="true" aria-label="Private Hand Choice">
                             <h2>Private Hand Choice</h2>
                             <p>Pass the device to ${this.escape_html(player.name)}.</p>
                             <button type="button" class="primary-action" data-action="reveal-private-decision" data-decision-id="${this.escape_html(decision.id)}">Reveal Hand</button>
@@ -617,7 +604,7 @@ export class UIHandler {
 
             return `
                 <div class="modal-overlay">
-                    <div class="choice-modal">
+                    <div class="choice-modal" role="dialog" aria-modal="true" aria-label="Discard ${decision.count}">
                         <h2>Discard ${decision.count}</h2>
                         ${view_state.decision_error === null ? "" : `<div class="form-error">${this.escape_html(view_state.decision_error)}</div>`}
                         <div class="discard-list">${choices}</div>

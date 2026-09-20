@@ -42,6 +42,7 @@ The combat log exists as secondary information. It never replaces the table as t
 - Single Player: 1 human plus computer opponents
 - Local Multiplayer: all participants are human and share one device
 - Local Multiplayer uses pass-and-play hand privacy
+- Single Player never uses pass-and-play prompts. The human seat stays fixed, their hand opens on their turn, and computer turns render one card or choice at a time. The most recent played card and recent outcomes remain visible between turns. Computer hands stay private.
 - The completed source material currently provides three finished character decks. Games above three participants may repeat character decks.
 
 ### Completed characters

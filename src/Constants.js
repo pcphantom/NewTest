@@ -19,7 +19,7 @@ export const RAID_PALADIN_COUNT = 3;
 export const RAID_PALADIN_HP = 2;
 export const EVENT_LOG_LIMIT = 80;
 export const INITIATIVE_DIE_SIDES = 20;
-export const AI_ACTION_DELAY_MS = 650;
+export const AI_ACTION_DELAY_MS = 1100;
 export const AI_INITIATIVE_DELAY_MS = 700;
 
 export const GAME_MODES = Object.freeze({

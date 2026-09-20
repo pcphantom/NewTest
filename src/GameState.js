@@ -36,6 +36,7 @@ export class GameState {
         this.actions_remaining = 0;
         this.pending_decisions = [];
         this.event_log = [];
+        this.last_play = null;
         this.winner_player_id = null;
         this.active_turn_must_end_after_decisions = false;
         this.next_summon_number = 1;

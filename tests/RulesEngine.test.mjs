@@ -345,10 +345,10 @@ test("computer player completes a legal Malric turn", () => {
     turn_handler.roll_initiative(game_state.get_next_initiative_player().id);
     assert.equal(game_state.get_active_player().player_type, PLAYER_TYPES.COMPUTER);
 
-    turn_handler.reveal_active_turn(game_state.get_active_player().id);
+    assert.equal(game_state.phase, PHASES.PLAY);
     ai_handler.take_active_turn();
 
-    assert.equal(game_state.phase, PHASES.HANDOFF);
+    assert.equal(game_state.phase, PHASES.PLAY);
     assert.equal(game_state.get_active_player().player_type, PLAYER_TYPES.HUMAN);
 });
 

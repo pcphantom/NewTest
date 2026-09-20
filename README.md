@@ -6,20 +6,22 @@ This repository contains a static browser implementation of the completed Python
 
 Open `index.html` through a web server.
 
+Double-clicking `index.html` (a `file://` address) cannot load the game's JavaScript modules. The entry page now explains this instead of staying blank. Copying only `index.html` is not enough: the server needs the whole project, including `src` and `Styles.css`.
+
 For GitHub Pages, use repository **Settings > Pages** and set **Source** to **Deploy from a branch**, with **main** and **/(root)** selected. The repository includes `.nojekyll` so GitHub Pages serves the static files directly.
 
 For local development:
 
 ```bash
-python3 -m http.server 8000
+python -m http.server 8765 --bind 127.0.0.1
 ```
 
-Then open `http://localhost:8000/`.
+Run that command from the repository root, keep the terminal running, then open `http://127.0.0.1:8765/`. If the server is already running there, use that address directly. Changes here are local until they are separately published to GitHub Pages.
 
 ## Game modes
 
-- Single Player: one human plus computer-controlled opponents
-- Local Multiplayer: 2 to 6 human players using hotseat play
+- Single Player: one human plus computer-controlled opponents. Turns flow automatically without handoff or Reveal Hand prompts. Your seat stays fixed; computer cards and choices resolve one at a time on the visible board. The latest played card stays visible between turns.
+- Local Multiplayer: 2 to 6 human players using hotseat play, with private handoff and Reveal Hand prompts.
 
 Every match begins with a visible d20 initiative roll. Highest roll takes the first turn. Highest ties reroll.
 
@@ -28,6 +30,7 @@ The d12 at each seat is labeled Health and tracks current HP; it is not rolled. 
 ## Table controls
 
 - Hover over Your hand to peek; move away to close. Click/tap pins it open or closes it.
+- In Single Player, your hand opens automatically on your turn and folds away when the computer starts, so you can watch the board. You can still inspect your own cards during computer turns. Discard choices open directly, without a privacy prompt. Computer hands remain private.
 - Hover a face-up card for a large preview. Click/tap to read its full rules and flavor text; choose Play to use a hand card.
 - Card skills at each seat explains the cards carrying that character's special effects. Opponents' private hands are never exposed.
 - Menu pauses the current match. Resume preserves hands, turns and pending choices. Ending a match requires confirmation.

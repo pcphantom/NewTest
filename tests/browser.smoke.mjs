@@ -233,12 +233,18 @@ try {
         while (game_state.phase === C.PHASES.INITIATIVE) turn_handler.roll_initiative(game_state.get_next_initiative_player().id);
         input_handler.render();
     });
+    assert.equal(await page.locator('.table-screen').count(), 1, 'single-player enters the board directly');
+    assert.equal(await action(page, 'reveal-turn').count(), 0, 'no single-player privacy handoff');
+    assert.equal(await page.locator('.active-playmat .seat-identity strong').innerText(), 'Human', 'the human seat stays fixed while CPU is active');
     await action(page, 'open-game-menu').click();
     const paused = await page.evaluate(() => JSON.stringify(testGame.game_state));
     await page.waitForTimeout(1000);
     assert.equal(await page.evaluate(() => JSON.stringify(testGame.game_state)), paused, "CPU cannot continue under pause menu");
     await action(page, 'resume-game').click();
     await page.waitForFunction(() => testGame.game_state.get_active_player().name === 'Human');
+    assert.equal(await action(page, 'reveal-turn').count(), 0);
+    assert.equal(await action(page, 'toggle-hand').getAttribute('aria-expanded'), 'true', 'human hand opens automatically');
+    assert.match(await page.locator('.last-play-caption').innerText(), /CPU played/, 'CPU play persists into the human turn');
     await action(page, 'open-game-menu').click();
     await action(page, 'request-quit').click();
     await action(page, 'confirm-quit').click();

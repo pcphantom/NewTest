@@ -66,42 +66,49 @@ export class AIPlayerHandler {
             throw new Error(`${player.name} is not a computer player.`);
         }
 
+        const turn_number = this.game_state.turn_number;
         let action_guard = 0;
-        while (this.game_state.phase === PHASES.PLAY && !player.eliminated) {
+        while (this.game_state.phase === PHASES.PLAY && this.game_state.turn_number === turn_number) {
             action_guard += 1;
             if (action_guard > 32) {
                 throw new Error(`${player.name} exceeded the computer turn action guard.`);
             }
 
-            if (!this.resolve_computer_decisions()) {
-                return;
-            }
+            if (!this.take_next_action()) return;
+        }
+    }
 
-            this.rules_engine.refill_empty_active_hand();
-            if (this.game_state.actions_remaining < 1 || player.hand.length === 0) {
-                break;
-            }
-
-            const selected_card = this.choose_card(player);
-            const conversion = this.choose_symbol_conversion(player, selected_card);
-            const targets = this.rules_engine.get_legal_targets(player.id, selected_card.instance_id, conversion);
-            const target = this.choose_target(player, selected_card, targets);
-
-            this.rules_engine.play_card(
-                player.id,
-                selected_card.instance_id,
-                target,
-                conversion
-            );
+    // The browser renders between steps so every card and choice can be seen.
+    take_next_action() {
+        if (this.game_state.phase !== PHASES.PLAY) return false;
+        const decision = this.game_state.get_current_decision();
+        if (decision !== null) {
+            const chooser = this.game_state.get_player_by_id(decision.player_id);
+            if (chooser.player_type !== PLAYER_TYPES.COMPUTER) return false;
+            this.rules_engine.resolve_decision(decision.id, chooser.id, this.choose_decision_resolution(chooser, decision));
+            return true;
         }
 
-        if (!this.resolve_computer_decisions()) {
-            return;
+        const player = this.game_state.get_active_player();
+        if (player.player_type !== PLAYER_TYPES.COMPUTER) return false;
+        if (player.eliminated) {
+            this.turn_handler.finish_active_turn();
+            return true;
         }
+        if (this.turn_handler.end_skipped_turn_if_ready()) return true;
 
-        if (this.game_state.phase === PHASES.PLAY && this.turn_handler.can_end_turn()) {
+        this.rules_engine.refill_empty_active_hand();
+        if (this.turn_handler.can_end_turn()) {
             this.turn_handler.end_turn(player.id);
+            return true;
         }
+
+        const selected_card = this.choose_card(player);
+        const conversion = this.choose_symbol_conversion(player, selected_card);
+        const targets = this.rules_engine.get_legal_targets(player.id, selected_card.instance_id, conversion);
+        const target = this.choose_target(player, selected_card, targets);
+        this.rules_engine.play_card(player.id, selected_card.instance_id, target, conversion);
+        return true;
     }
 
     choose_card(player) {

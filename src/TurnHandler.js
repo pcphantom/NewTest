@@ -7,6 +7,7 @@
 import {
     BASE_ACTIONS_PER_TURN,
     CARDS_DRAWN_PER_TURN,
+    GAME_MODES,
     INITIATIVE_DIE_SIDES,
     OPENING_HAND_SIZE,
     PHASES,
@@ -94,8 +95,8 @@ export class TurnHandler {
         this.game_state.turn_number = 1;
         this.game_state.round_number = 1;
         this.game_state.actions_remaining = 0;
-        this.game_state.phase = PHASES.HANDOFF;
         this.game_state.add_event(`${winner.name} won initiative and takes the first turn.`, "system");
+        this.prepare_active_turn();
 
         return {
             complete: true,
@@ -114,6 +115,20 @@ export class TurnHandler {
         if (player.id !== player_id) {
             throw new Error(`${player_id} cannot reveal ${player.name}'s turn.`);
         }
+
+        this.begin_active_turn();
+    }
+
+    prepare_active_turn() {
+        if (this.game_state.game_mode === GAME_MODES.LOCAL_MULTIPLAYER) {
+            this.game_state.phase = PHASES.HANDOFF;
+        } else {
+            this.begin_active_turn();
+        }
+    }
+
+    begin_active_turn() {
+        const player = this.game_state.get_active_player();
 
         this.game_state.phase = PHASES.PLAY;
         this.game_state.actions_remaining = BASE_ACTIONS_PER_TURN;
@@ -233,7 +248,7 @@ export class TurnHandler {
         this.game_state.active_player_index = next_index;
         this.game_state.turn_number += 1;
         this.game_state.actions_remaining = 0;
-        this.game_state.phase = PHASES.HANDOFF;
         this.game_state.add_event(`Turn passes to ${this.game_state.get_active_player().name}.`, "system");
+        this.prepare_active_turn();
     }
 }

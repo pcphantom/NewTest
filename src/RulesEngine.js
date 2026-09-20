@@ -237,6 +237,11 @@ export class RulesEngine {
         this.game_state.actions_remaining -= 1;
         player.cards_played_this_turn += 1;
         player.last_played_card_definition_id = definition.id;
+        this.game_state.last_play = {
+            player_id: player.id,
+            definition_id: definition.id,
+            turn_number: this.game_state.turn_number,
+        };
 
         if (symbol_conversion !== null) {
             this.game_state.add_event(`${player.name} used Can Do Everything: ${symbol_conversion.from} became ${symbol_conversion.to}.`, "ability");
