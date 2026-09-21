@@ -27,7 +27,7 @@ export class CardRenderer {
         return `
             <button
                 type="button"
-                class="game-card hand-card ${theme_class} ${type_class}"
+                class="game-card hand-card${enabled ? '' : ' hand-card-unavailable'} ${theme_class} ${type_class}"
                 style="--hand-rotation: ${rotation}deg; --hand-index: ${card_index};"
                 data-action="${enabled ? 'select-card' : 'inspect-card'}"
                 data-card-definition-id="${this.escape_html(definition.id)}"

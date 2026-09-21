@@ -27,12 +27,14 @@ test("hand cards keep the original fan and play directly only when playable", ()
     const playable = renderer.render_hand_card(card, true, 0, 4);
     assert.match(playable, /data-action="select-card"/);
     assert.match(playable, /aria-label="Play Screen Saver"/);
+    assert.doesNotMatch(playable, /hand-card-unavailable/);
     assert.match(playable, /--hand-rotation: -3.1500000000000004deg/);
     assert.match(renderer.render_hand_card(card, true, 0, 20), /--hand-rotation: -8deg/);
     assert.match(renderer.render_hand_card(card, true, 19, 20), /--hand-rotation: 8deg/);
     const unavailable = renderer.render_hand_card(card, false, 0, 4);
     assert.match(unavailable, /data-action="inspect-card"/);
     assert.match(unavailable, /aria-label="Read Screen Saver"/);
+    assert.match(unavailable, /hand-card-unavailable/);
     assert.doesNotMatch(unavailable, /\bdisabled\b/, "unavailable cards remain readable, without disabled-button transparency");
 });
 

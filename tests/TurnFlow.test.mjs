@@ -101,6 +101,39 @@ test("Screen Saver plays immediately, without an inspection, confirmation or tar
     assert.ok(!g.human.hand.some(card => card.instance_id === button.dataset.cardInstanceId));
 });
 
+test("hand cards grey out when the final play is used and recover next turn without blocking reading", () => {
+    const g = game();
+    const { input } = input_harness(g);
+    const { ui, app, view } = ui_harness();
+    const render_hand = () => {
+        ui.render_table(g.state, g.rules, g.turns, view);
+        return app.innerHTML;
+    };
+    assert.doesNotMatch(render_hand(), /hand-card-unavailable/);
+    input.select_card(hand_button(g, 'grandpa_refresh_rate'));
+    assert.equal(g.state.actions_remaining, 2);
+    assert.doesNotMatch(render_hand(), /hand-card-unavailable/, 'Play Again keeps the hand playable');
+    input.select_card(hand_button(g, 'grandpa_screen_saver'));
+    assert.equal(g.state.actions_remaining, 1);
+    assert.doesNotMatch(render_hand(), /hand-card-unavailable/);
+    input.select_card(hand_button(g, 'grandpa_monochrome_shield'));
+    assert.equal(g.state.actions_remaining, 0);
+    const exhausted = render_hand();
+    assert.equal((exhausted.match(/hand-card-unavailable/g) ?? []).length, g.human.hand.length);
+    assert.doesNotMatch(exhausted, /data-action="select-card"/);
+    const card = g.human.hand[0];
+    const before = JSON.stringify(g.state);
+    input.inspect_card(hand_button(g, card.definition_id));
+    assert.equal(input.view_state.inspected_card.definition_id, card.definition_id);
+    assert.equal(JSON.stringify(g.state), before, 'grey cards still open read-only details');
+    g.turns.end_turn(g.human.id);
+    assert.equal((render_hand().match(/hand-card-unavailable/g) ?? []).length, g.human.hand.length, 'hand remains grey during the CPU turn');
+    g.state.actions_remaining = 0;
+    g.turns.end_turn(g.cpu.id);
+    assert.equal(g.state.actions_remaining, 1);
+    assert.doesNotMatch(render_hand(), /hand-card-unavailable/, 'normal colors return with the next human play');
+});
+
 test("clicking an attack goes straight to its required target, not an extra Play confirmation", () => {
     const g = game();
     const { input } = input_harness(g);

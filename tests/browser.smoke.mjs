@@ -140,6 +140,17 @@ try {
         assert.equal(await action(page, "choose-card-target").count(), 1);
         await activate(action(page, "choose-card-target"));
         assert.equal(await page.locator('[data-player-id="player_2"] [role="meter"]').getAttribute('aria-valuenow'), '10');
+        const exhaustedStyles = await page.locator('.hand-card').evaluateAll(nodes => nodes.map(node => {
+            const style = getComputedStyle(node);
+            return { filter: style.filter, opacity: style.opacity, action: node.dataset.action, unavailable: node.classList.contains('hand-card-unavailable') };
+        }));
+        assert.ok(exhaustedStyles.length > 0);
+        assert.ok(exhaustedStyles.every(card => card.unavailable && card.opacity === '1' && card.action === 'inspect-card'), 'exhausted cards remain opaque and readable');
+        if (!touch) {
+            await page.locator('.hand-card').first().hover();
+            await page.waitForTimeout(150);
+        }
+        assert.ok((await page.locator('.hand-card').first().evaluate(node => getComputedStyle(node).filter)).includes('grayscale(1)'), 'hover must not remove the out-of-plays feedback');
         await activate(action(page, "toggle-hand"));
         // Put a genuine public Defense in an opponent's zone; never reveal their hand.
         await page.evaluate(async () => {

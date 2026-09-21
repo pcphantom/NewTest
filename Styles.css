@@ -891,14 +891,18 @@ button.game-card {
     -webkit-touch-callout: none;
     transform-origin: 50% 130%;
     transform: rotate(var(--hand-rotation)) translateY(8px);
+    filter: var(--hand-state-filter, none);
     transition: transform 130ms ease, filter 130ms ease;
 }
+
+/* Grey unavailable cards without making overlapping card surfaces transparent. */
+.hand-card-unavailable {--hand-state-filter: grayscale(1) brightness(0.65);}
 
 .hand-card:hover:not(:disabled),
 .hand-card:focus-visible:not(:disabled) {
     z-index: 1000;
     transform: rotate(0deg) translateY(-32px) scale(1.09);
-    filter: brightness(1.05);
+    filter: var(--hand-state-filter, brightness(1.05));
 }
 
 /* A disabled card still covers the cards beneath it; never fade the whole surface. */
