@@ -131,9 +131,9 @@ export class CardRenderer {
     render_symbols(symbols) {
         const parts = [];
         for (const symbol_name of ["attack", "defense", "healing", "draw", "play_again"]) {
-            if (symbols[symbol_name] > 0) {
-                const label = `${symbols[symbol_name]} ${symbol_name.replaceAll('_', ' ')}`;
-                parts.push(`<span class="card-symbol symbol-${symbol_name}" role="img" aria-label="${label}" title="${label}"><span class="symbol-glyph" aria-hidden="true">${SYMBOL_GLYPHS[symbol_name]}</span><strong class="symbol-value" aria-hidden="true">${symbols[symbol_name]}</strong></span>`);
+            for (let symbol_number = 0; symbol_number < symbols[symbol_name]; symbol_number += 1) {
+                const label = `1 ${symbol_name.replaceAll('_', ' ')}`;
+                parts.push(`<span class="card-symbol symbol-${symbol_name}" role="img" aria-label="${label}">${SYMBOL_GLYPHS[symbol_name]}</span>`);
             }
         }
 

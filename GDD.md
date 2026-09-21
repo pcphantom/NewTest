@@ -163,7 +163,7 @@ Displays:
 - character portrait
 - player name
 - character name
-- HP shown as a d12-style tracker with Health directly above it, current/max HP and a health bar
+- HP shown on the original d12 tracker with Health directly above it, without an added fraction or health bar
 - status effects
 
 ### Draw pile

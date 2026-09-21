@@ -64,7 +64,7 @@ export class UIHandler {
             <button type="button" class="primary-action" data-action="resume-game">Resume game</button>
             <button type="button" class="choice-button" data-action="toggle-fullscreen">${this.document.fullscreenElement === null ? 'Full screen' : 'Exit full screen'}</button>
             <details class="in-game-rules"><summary>How to play</summary>
-                <p>Everyone starts with ${STARTING_HP} HP and can heal up to ${STARTING_HP}. The d12 at each seat tracks HP; it is not rolled. The number and health bar fall when damage reaches you. Last player standing wins.</p>
+                <p>Everyone starts with ${STARTING_HP} HP and can heal up to ${STARTING_HP}. The d12 labeled Health at each seat tracks HP; it is not rolled. Its number falls when damage reaches you. Last player standing wins.</p>
                 <p>Draw one card at the start of your turn, then play a card. Attack deals damage, Defense absorbs it first, Healing restores HP, Draw adds cards, and Play Again grants another card play.</p>
                 <p>If you still must play but your hand is empty, draw 2. An empty draw pile is refilled by shuffling your discard pile. If no cards are available, do as much as possible.</p>
                 <p>With 5 or 6 living players, standard attacks target your nearest living neighbor on either side. Area attacks and Mighty Powers are exempt; a card's forced target overrides the normal choice.</p>
@@ -525,8 +525,8 @@ export class UIHandler {
                         <button type="button" class="skills-button" data-action="show-skills" data-player-id="${player.id}">Card skills</button>
                     </div>
                     <div class="health-meter" role="meter" aria-label="${this.escape_html(player.name)} health" aria-valuemin="0" aria-valuemax="${player.max_hp}" aria-valuenow="${player.hp}">
-                        <span>Health</span><strong><span class="hp-tracker-face" aria-hidden="true">${player.hp}</span><span>/ ${player.max_hp} HP</span></strong>
-                        <div class="health-track"><span style="width: ${100 * player.hp / player.max_hp}%"></span></div>
+                        <span>Health</span>
+                        <div class="hp-die"><span>d12</span><strong>${player.hp}</strong></div>
                     </div>
                 </div>
 

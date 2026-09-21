@@ -75,6 +75,18 @@ function hand_button(g, definition_id) {
     };
 }
 
+test("health uses the original d12 with only Health added above it", () => {
+    const g = game();
+    const { ui } = ui_harness();
+    for (const hp of [12, 7, 0]) {
+        g.human.hp = hp;
+        const html = ui.render_player_playmat(g.human, true);
+        assert.match(html, new RegExp(`aria-valuemax="12" aria-valuenow="${hp}"`));
+        assert.match(html, new RegExp(`<span>Health</span>\\s*<div class="hp-die"><span>d12</span><strong>${hp}</strong></div>`));
+        assert.doesNotMatch(html, /hp-tracker-face|health-track|\/ 12 HP/);
+    }
+});
+
 test("Screen Saver plays immediately, without an inspection, confirmation or target prompt", () => {
     const g = game();
     const { input } = input_harness(g);

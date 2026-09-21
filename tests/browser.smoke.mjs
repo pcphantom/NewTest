@@ -64,7 +64,9 @@ try {
         const activate = locator => touch ? locator.tap() : locator.click();
         await boardFits(page);
         assert.deepEqual(await page.locator('[role="meter"]').evaluateAll(nodes => nodes.map(n => [n.getAttribute("aria-valuenow"), n.getAttribute("aria-valuemax")])), [["12","12"],["12","12"]]);
-        assert.equal(await page.locator(".hp-die").count(), 0);
+        assert.equal(await page.locator(".hp-die").count(), 2);
+        assert.deepEqual(await page.locator('.hp-die strong').allTextContents(), ['12', '12']);
+        assert.equal(await page.locator('.hp-tracker-face, .health-track, .symbol-value').count(), 0);
         assert.equal(await action(page, "select-ability").count(), 0);
         if (!touch) {
             await action(page, "toggle-hand").hover();
@@ -224,7 +226,9 @@ try {
     await page.locator('.hand-card[data-card-definition-id="patchadin_blatant_favoritism"]').first().hover();
     assert.equal(await page.locator('#card-hover-preview').isVisible(), false);
     const v2Card = page.locator('.hand-card[data-card-definition-id="patchadin_blatant_favoritism"]').first();
-    assert.equal(await v2Card.locator('.symbol-value').count(), 4);
+    assert.equal(await v2Card.locator('.card-symbol').count(), 5);
+    assert.equal(await v2Card.locator('.symbol-attack').count(), 2);
+    assert.equal(await v2Card.locator('.symbol-value').count(), 0);
     assert.match(await v2Card.innerText(), /Developer's Favorite/);
     const v2Preview = await v2Card.boundingBox();
     assert.ok(v2Preview.y >= 0 && v2Preview.y + v2Preview.height <= 901);

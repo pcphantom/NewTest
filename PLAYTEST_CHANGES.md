@@ -38,7 +38,7 @@ V2 changes five source files: the brief, index, Patchadin deck, recovered Godot 
 - Blatant Favoritism replaces Obvious Favoritism, with two copies. The printed base effects are 2 attack, 1 healing, 1 shield and 1 Play Again. Developer's Favorite is now attached here.
 - Divine Intervention replaces the retired Paladins are OP at Everything. It sacrifices all active Defense cards, heals to maximum and grants Play Again. Sacrifice is not a damage-triggered shield break.
 - Blessing of Kings drops from two copies to one; Wake of Ashes fills the remaining slot. Wake deals 1 damage to all opponents and cancels the selected opponent's next extra play.
-- The card UI renders one large icon and an outlined number per nonzero effect. Repeated symbols remain source-document notation, not the digital presentation.
+- The card UI retains the original repeated symbols: four shields are four separate shield icons. Numeric overlays do not replace those symbols.
 - The complete shared rules specify recycling the discard into an empty deck, drawing two when a mandatory play meets an empty hand, and resolving unavailable draws as far as possible. The earlier browser exception was incorrect and is removed.
 - Zone of Influence restricts standard attacks with 5 or 6 living players to the nearest living seat on either side. Area effects and Mighty Powers are exempt; forced targets override normal selection. With four or fewer living players the restriction lifts. This living-seat interpretation is stated in the in-game help.
 

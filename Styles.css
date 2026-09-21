@@ -528,7 +528,8 @@ p {
     text-align: center;
 }
 
-.initiative-die {
+.initiative-die,
+.hp-die {
     width: 66px;
     height: 66px;
     display: grid;
@@ -542,13 +543,15 @@ p {
     color: #f2dda0;
 }
 
-.initiative-die span {
+.initiative-die span,
+.hp-die span {
     font-family: "Courier New", monospace;
     font-size: 0.58rem;
     opacity: 0.72;
 }
 
-.initiative-die strong {
+.initiative-die strong,
+.hp-die strong {
     font-size: 1.45rem;
     line-height: 1;
 }
@@ -1175,6 +1178,15 @@ button.game-card {
     text-overflow: ellipsis;
 }
 
+.hp-die {
+    width: 54px;
+    height: 54px;
+    border-color: #c9aa59;
+}
+
+.hp-die strong {
+    font-size: 1.2rem;
+}
 
 .seat-zones {
     display: grid;
@@ -1581,13 +1593,8 @@ button.game-card {
 .health-overview {display: flex; gap: 8px; overflow-x: auto; padding: 3px 0 5px; position: sticky; top: -18px; z-index: 12; background: #183b32;}
 .health-summary {flex-shrink: 0; padding: 7px 10px; border: 1px solid #698574; border-radius: 6px; background: #10241d; font-size: .8rem;}
 .health-summary strong {margin-right: 8px; color: #e5d3a5;}
-.health-meter {min-width: 94px; display: grid; gap: 4px; padding: 7px; background: #0c1c17; border: 1px solid #4b7659; border-radius: 8px;}
+.health-meter {display: grid; justify-items: center; gap: 4px;}
 .health-meter > span {font-size: .65rem; color: #b4c9b8; text-transform: uppercase;}
-.health-meter strong {font-size: .9rem; color: #a7e0b0; white-space: nowrap;}
-.health-track {height: 6px; border-radius: 4px; background: #313d34; overflow: hidden;}
-.health-track span {display: block; height: 100%; background: #7bcc8b;}
-.health-meter strong {display: flex; align-items: center; gap: 5px;}
-.hp-tracker-face {width: 28px; height: 30px; display: grid; place-items: center; background: #bba45d; color: #181b11; clip-path: polygon(50% 0%, 92% 22%, 100% 66%, 67% 100%, 28% 100%, 0% 62%, 9% 22%);}
 .skills-button {justify-self: start; min-height: 32px; padding: 5px 8px; background: #1d3228; border: 1px solid #6c7752; border-radius: 5px; font-size: .72rem; cursor: pointer;}
 .seat-zones .card-stack, .seat-zones .mini-card, .discard-stack {width: 46px; height: 64px;}
 .seat-zones .mini-card-art {height: 38px;}
@@ -1601,14 +1608,8 @@ button.game-card {
 .current-play-card .card-rule-box {display: none;}
 .card-skill {margin-top: 5px; padding-top: 5px; border-top: 1px solid #a39575;}
 .card-skill strong {display: block; color: #57400c;}
-.card-symbol {position: relative; display: inline-grid; place-items: center; width: 34px; height: 34px; flex: 0 0 auto;}
-.symbol-glyph {font-size: 30px; line-height: 1;}
-.symbol-value {position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; font: 900 21px/1 "Trebuchet MS", sans-serif; -webkit-text-stroke: 2px #161919; paint-order: stroke fill; text-shadow: 0 1px 2px black;}
-.card-symbol-row {gap: 4px; display: flex; justify-content: center; align-items: center;}
-.hand-card .card-frame {grid-template-rows: 38px 70px 42px minmax(80px, 1fr) 30px;}
-.table-card .card-symbol {width: 20px; height: 20px;}
-.table-card .symbol-glyph {font-size: 19px;}
-.table-card .symbol-value {font-size: 14px; -webkit-text-stroke-width: 1.5px;}
+/* Keep repeated symbols legible within the existing small public-card frames. */
+.table-card .card-symbol-row {font-size: .5rem; padding: 2px; flex-wrap: wrap; align-content: center;}
 .card-rule-box {overflow: hidden;}
 .card-hover-preview {position: fixed; z-index: 70; pointer-events: none; width: min(320px, calc(100vw - 16px)); transform-origin: top left;}
 .card-hover-preview .inspection-face {max-width: none; aspect-ratio: 216 / 316; display: grid;}
@@ -1622,10 +1623,7 @@ button.game-card {
 .inspection-face .card-name {font-size: 1.03rem; line-height: 1.2; overflow: visible;}
 .inspection-face .card-type-badge {font-size: .65rem;}
 .inspection-face .card-rule-box {font-size: .9rem; line-height: 1.4; padding: 8px; overflow: visible;}
-.inspection-face .card-symbol-row {min-height: 34px; flex-wrap: wrap;}
-.inspection-face .card-symbol {width: 64px; height: 64px;}
-.inspection-face .symbol-glyph {font-size: 54px;}
-.inspection-face .symbol-value {font-size: 34px; -webkit-text-stroke-width: 3px;}
+.inspection-face .card-symbol-row {min-height: 34px; flex-wrap: wrap; font-size: 1.5rem;}
 .inspection-face .card-flavor-box {font-size: .75rem; line-height: 1.3; padding: 8px; overflow: visible;}
 .card-inspection {width: min(480px, 100%);}
 .inspection-actions {display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;}
